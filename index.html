@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#5b1526">
+<title>New Song Songbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: steady and practical, a music stand at rehearsal, readable at arm's length
+   IDEA: a hymnal's cloth cover opening onto a lead sheet
+   PICTURE: the song index and the live, transposable chord chart themselves
+   COLOUR and TYPE: burgundy cloth band, white page, chord-ink blue; Literata for titles and lyrics, Figtree for controls
+   LAYOUT: index column left, chart right; one column on phones with a back button */
+:root{--bg:#fff;--ink:#1d1416;--mute:#6d5e62;--line:#ebe3e5;--soft:#f8f3f4;--cloth:#5b1526;--chord:#1c58c9;--hi:#fbe9ec;--danger:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#120b0e;--ink:#f3ecee;--mute:#b7a7ac;--line:#2e2226;--soft:#1b1215;--cloth:#3a0d19;--chord:#8ab6ff;--hi:#2b151b;--danger:#ff8a80}}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Figtree,system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3{font-family:Literata,Georgia,serif;font-weight:600;line-height:1.1;margin:0;text-wrap:balance}
+h3{font-size:22px;margin-top:32px}
+a{color:var(--chord)}
+button,input,select,textarea{font:inherit;color:inherit}
+button,.btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--bg);cursor:pointer;font-weight:600;display:inline-flex;align-items:center;text-decoration:none;color:inherit}
+button:hover,.btn:hover{background:var(--soft)}
+button.pri,.btn.pri{background:var(--cloth);border-color:var(--cloth);color:#fff}
+button.ghost{border-color:transparent;background:transparent}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.row:focus-visible,.btn:focus-visible{outline:3px solid var(--chord);outline-offset:2px}
+input,select,textarea{font-size:16px;min-height:44px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);width:100%}
+textarea{min-height:120px;resize:vertical;line-height:1.5}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:15px}
+label{display:block;font-size:14px;font-weight:600;color:var(--mute);margin:14px 0 6px}
+header{background:var(--cloth);color:#fff;padding:20px max(4vw,16px) 0}
+.brand{display:flex;gap:14px;align-items:center}
+.brand svg{width:46px;height:46px;flex:none}
+h1{font-size:34px}
+#church{margin:2px 0 0;opacity:.8;font-size:15px}
+.tabs{display:flex;gap:4px;margin-top:16px;flex-wrap:wrap}
+.tabs button{background:transparent;border:0;color:#fff;opacity:.75;border-radius:10px 10px 0 0;padding:0 18px}
+.tabs button[aria-current=true]{background:var(--bg);color:var(--ink);opacity:1}
+.bar{display:flex;gap:10px;padding:14px max(4vw,16px);border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+.bar input{flex:2 1 220px;width:auto}.bar select{flex:1 1 150px;width:auto}
+#status{font-size:14px;color:var(--mute);flex:1 1 100%}
+.wrap{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);min-height:70vh}
+#list{border-right:1px solid var(--line);padding:8px 0}
+#detail{padding:24px max(3vw,16px) 60px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:12px max(4vw,16px) 12px 20px;border:0;border-bottom:1px solid var(--line);width:100%;text-align:left;background:none;border-radius:0;font-weight:400;min-height:0;color:inherit;text-decoration:none}
+.row[aria-current=true]{background:var(--hi)}
+.row .t{font-family:Literata,serif;font-size:17px;font-weight:600}
+.row .s{color:var(--mute);font-size:14px}
+.row .k{grid-row:span 2;align-self:center;text-align:right;white-space:nowrap}
+.key{display:inline-block;min-width:40px;padding:2px 8px;border-radius:8px;background:var(--cloth);color:#fff;font-weight:700;text-align:center}
+.meta{color:var(--mute);font-size:14px;white-space:nowrap}
+.hd{padding:14px 20px 4px;font-size:14px;font-weight:700;color:var(--mute)}
+.empty{padding:28px 20px;color:var(--mute)}
+.back{display:none;margin:-8px 0 12px -10px}
+.top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
+h2{font-size:clamp(28px,4vw,42px)}
+.by{color:var(--mute);margin-top:6px}
+.acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.facts{display:flex;flex-wrap:wrap;gap:10px 28px;margin:20px 0;padding:14px 0;border-block:1px solid var(--line)}
+.facts div{display:flex;flex-direction:column}
+.facts small{font-size:13px;color:var(--mute);font-weight:600}
+.facts strong{font-size:22px;white-space:nowrap}
+#pulse{display:inline-block;width:14px;height:14px;border-radius:50%;background:var(--line);vertical-align:middle;margin-left:6px}
+#pulse.on{animation:p .18s ease-out}#pulse.one{background:var(--chord)}
+@keyframes p{from{transform:scale(1.7);background:var(--chord)}}
+@media (prefers-reduced-motion:reduce){#pulse.on{animation:none;background:var(--chord)}}
+.arr{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0}
+.arr span{padding:4px 10px;border-radius:8px;background:var(--soft);border:1px solid var(--line);font-weight:600;font-size:15px}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:20px 0 8px;padding:10px;background:var(--soft);border-radius:12px}
+.tools select{width:auto}
+.tools .sep{width:1px;height:28px;background:var(--line)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;border-radius:0}.seg button[aria-pressed=true]{background:var(--cloth);color:#fff}
+.seg select{border:0;border-radius:0;width:auto}
+.capo{font-size:14px;color:var(--mute);margin:4px 0 0}
+.chart{--cs:19px;font-family:Literata,Georgia,serif;font-size:var(--cs);margin-top:8px}
+.chart .ln{margin:0;line-height:1.35}
+.chart .hc{padding-top:2px}
+.chart .w{display:inline-block;white-space:pre}
+.chart .w b{display:block;font-family:Figtree,sans-serif;font-weight:700;color:var(--chord);font-size:.88em;padding-right:.45em;min-height:1.3em}
+.chart .sec{font-family:Figtree,sans-serif;font-size:15px;color:var(--mute);margin:22px 0 4px;font-weight:700}
+.chart .gap{height:.7em}
+.notes{white-space:pre-wrap;background:var(--soft);padding:14px 16px;border-radius:12px;margin-top:20px}
+.links a{margin-right:14px;overflow-wrap:anywhere}
+.tk{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.tk span{font-size:14px;padding:4px 10px;border:1px solid var(--line);border-radius:999px}
+.ref{display:inline-flex;align-items:center;padding:2px 12px;border-radius:999px;background:var(--hi);border:0;font-weight:600;font-size:15px;margin:0 6px 6px 0;min-height:32px}
+.help{font-size:14px;color:var(--mute);margin:6px 0 0}
+.item{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+.item .n{font-family:Literata,serif;font-size:22px;color:var(--mute)}
+.item .row{padding:0;border:0}
+.nextsong{display:flex;justify-content:space-between;gap:12px;margin-top:36px;padding-top:16px;border-top:1px solid var(--line);flex-wrap:wrap}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.pv{display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 10px;padding:10px 0;border-bottom:1px solid var(--line);align-items:start}
+.pv input{width:22px;height:22px;min-height:0;margin-top:3px}
+.pv small{color:var(--mute);display:block}
+.dup{color:var(--danger)}
+ol.steps{padding-left:22px}ol.steps li{margin:6px 0}
+code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:.92em}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
+#toast.show{opacity:1}
+@media(max-width:900px){.wrap{grid-template-columns:minmax(0,1fr)}#list{border-right:0}body.sel #list{display:none}body:not(.sel) #detail{display:none}.back{display:inline-flex}}
+@media(max-width:600px){h1{font-size:28px}.chart{--cs:18px}.facts strong{font-size:19px}.two{grid-template-columns:minmax(0,1fr)}}
+@media print{header,.bar,#list,.tools,.acts,.back,.nextsong{display:none!important}.wrap{display:block}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg viewBox="0 0 46 46" aria-hidden="true"><rect x="1" y="1" width="44" height="44" rx="10" fill="#fff" opacity=".12"/><g stroke="#fff" stroke-width="1.4" opacity=".85"><line x1="7" y1="14" x2="39" y2="14"/><line x1="7" y1="19" x2="39" y2="19"/><line x1="7" y1="24" x2="39" y2="24"/><line x1="7" y1="29" x2="39" y2="29"/><line x1="7" y1="34" x2="39" y2="34"/></g><ellipse cx="19" cy="31.5" rx="4.6" ry="3.4" transform="rotate(-20 19 31.5)" fill="#fff"/><path d="M23.2 30V9.5c4 1.5 7.5 3.6 8.5 8" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
+    <div><h1>New Song</h1><p id="church">Music ministry songbook</p></div>
+  </div>
+  <nav class="tabs" aria-label="Sections">
+    <button data-act="tab" data-v="sets" aria-current="true">Sets</button>
+    <button data-act="tab" data-v="songs">Songs</button>
+    <button data-act="editors">For editors</button>
+  </nav>
+</header>
+<div class="bar">
+  <input id="q" type="search" placeholder="Search titles, lyrics, tags or Scripture (Ps 23, Rev 4:8)" aria-label="Search songs">
+  <select id="team" aria-label="Team"></select>
+  <button data-act="refresh" aria-label="Refresh from the songbook sheet">↻ Refresh</button>
+  <span id="status" role="status"></span>
+</div>
+<main class="wrap">
+  <section id="list" aria-label="List"></section>
+  <section id="detail" aria-live="polite"></section>
+</main>
+<div id="toast" role="status"></div>
+<script>
+/* ===== Settings: the Google Sheet this songbook reads. =====
+   Another church can use this same page with their own copy of the sheet:
+   add ?sheet=THEIR_SHEET_ID to the address, or change the ID below. */
+const DEFAULT_SHEET_ID='1ivlzwVRwPJXo3SxhO4h9t5-BdzVkABOINMehsgzmcw8';
+{
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const N={C:0,'B#':0,'C#':1,Db:1,D:2,'D#':3,Eb:3,E:4,Fb:4,F:5,'E#':5,'F#':6,Gb:6,G:7,'G#':8,Ab:8,A:9,'A#':10,Bb:10,B:11,Cb:11};
+const SH=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],FL=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const MAJ=['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'],MIN=['Cm','C#m','Dm','Ebm','Em','Fm','F#m','Gm','G#m','Am','Bbm','Bm'];
+const DEG=['1','b2','2','b3','3','4','#4','5','b6','6','b7','7'];
+const root=k=>(k||'C').replace(/m$/,''),isMin=k=>/m$/.test(k||'');
+const idx=k=>N[root(k)]??0;
+const flats=k=>isMin(k)?['D','G','C','F','Bb','Eb'].includes(root(k)):['F','Bb','Eb','Ab','Db','Gb'].includes(root(k));
+const shiftKey=(k,d)=>{const i=(idx(k)+d+120)%12;return isMin(k)?MIN[i]:MAJ[i]};
+const keyOpts=sel=>[...MAJ,...MIN].map(k=>`<option ${k===sel?'selected':''}>${k}</option>`).join('');
+const pad=n=>String(n).padStart(2,'0');
+const isoDay=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const today=isoDay(new Date());
+const fmtDate=(d,o={weekday:'short',month:'short',day:'numeric',year:'numeric'})=>d?new Date(d+'T12:00').toLocaleDateString(undefined,o):'';
+const slug=s=>String(s||'').toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g,'').trim().replace(/[\s_]+/g,'-').slice(0,60)||'x';
+function normKey(k){const m=String(k||'').trim().match(/^([A-Ga-g])\s*([#b♯♭])?\s*(m(?!aj)|min|minor)?/);if(!m)return '';const r=m[1].toUpperCase()+(m[2]?m[2].replace('♯','#').replace('♭','b'):'');const i=N[r];if(i===undefined)return '';return m[3]?MIN[i]:MAJ[i]}
+
+const params=new URLSearchParams(location.search);
+const SHEET=(params.get('sheet')||DEFAULT_SHEET_ID).trim();
+const SHEET_URL=`https://docs.google.com/spreadsheets/d/${encodeURIComponent(SHEET)}/edit`;
+const feed=tab=>`https://docs.google.com/spreadsheets/d/${encodeURIComponent(SHEET)}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(tab)}`;
+
+let songs=[],sets=[],settings={church:'',teams:[]},loadedAt=0,loading=false,hasData=false;
+let tab='sets',sel=null,team='',q='',qRefs=[];
+let view={key:null,capo:0,mode:'ch',size:19};
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+{const v=store.get('ns-view')||{};if(v.size)view.size=v.size;if(v.mode)view.mode=v.mode;team=store.get('ns-team')||''}
+const remember=()=>{store.set('ns-view',{size:view.size,mode:view.mode});store.set('ns-team',team)};
+const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('show'),2600)};
+const song=id=>songs.find(s=>s.id===id);
+const setById=id=>sets.find(s=>s.id===id);
+const teamKey=(s,t=team)=>(t&&s.teamKeys&&s.teamKeys[t])||s.key||'C';
+
+/* ---------- reading the sheet ---------- */
+function csvRows(txt){
+  const rows=[];let row=[],f='',qd=false;
+  for(let i=0;i<txt.length;i++){const c=txt[i];
+    if(qd){if(c==='"'){if(txt[i+1]==='"'){f+='"';i++}else qd=false}else f+=c}
+    else if(c==='"')qd=true;else if(c===','){row.push(f);f=''}else if(c==='\n'){row.push(f);rows.push(row);row=[];f=''}else if(c!=='\r')f+=c}
+  if(f||row.length){row.push(f);rows.push(row)}
+  return rows;
+}
+function table(txt){
+  const rows=csvRows(txt||'');const hd=(rows.shift()||[]).map(h=>h.trim().toLowerCase());
+  return rows.filter(r=>r.some(x=>x.trim())).map(r=>{const o={};hd.forEach((h,i)=>o[h]=(r[i]||'').trim());return o});
+}
+const col=(o,...names)=>{for(const n of names){if(o[n]!==undefined&&o[n]!=='')return o[n]}return ''};
+function fixSig(v){v=String(v||'').trim();const m=v.match(/^(\d{1,2})\/(\d{1,2})\/\d{2,4}$/);if(m)return `${+m[1]}/${+m[2]}`;const d=v.match(/^\d{4}-(\d{2})-(\d{2})$/);if(d)return `${+d[1]}/${+d[2]}`;return v||'4/4'}
+function fixDate(v){v=String(v||'').trim();let m;
+  if(m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  if(m=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/))return `${m[3].length===2?'20'+m[3]:m[3]}-${pad(m[1])}-${pad(m[2])}`;
+  const d=new Date(v);return isNaN(d)?'':isoDay(d)}
+function build(raw){
+  const used={};
+  songs=table(raw.songs).filter(o=>col(o,'title','song')).map(o=>{
+    const title=col(o,'title','song');let id=slug(title);if(used[id])id+='-'+(++used[id]);else used[id]=1;
+    const tk={};col(o,'team keys').split(/[;\n]/).forEach(p=>{const m=p.split('=');if(m.length===2&&normKey(m[1]))tk[m[0].trim()]=normKey(m[1])});
+    return {id,title,author:col(o,'author','artist'),ccli:(col(o,'ccli').match(/\d+/)||[''])[0],key:normKey(col(o,'key'))||'C',bpm:parseInt(col(o,'bpm','tempo'))||null,sig:fixSig(col(o,'time','meter')),
+      scripture:col(o,'scripture'),tags:col(o,'tags').split(',').map(x=>x.trim()).filter(Boolean),arrangement:col(o,'arrangement','order'),teamKeys:tk,chart:col(o,'chart','lyrics'),notes:col(o,'notes'),links:col(o,'links')};
+  });
+  const byTitle={};songs.forEach(s=>{byTitle[s.title.toLowerCase()]=byTitle[s.title.toLowerCase()]||s});
+  const groups=new Map();
+  for(const o of table(raw.sets)){
+    const date=fixDate(col(o,'date'));if(!date)continue;
+    const service=col(o,'service')||'Service',tm=col(o,'team');const id=slug(date+'-'+service+(tm?'-'+tm:''));
+    if(!groups.has(id))groups.set(id,{id,date,title:service,team:tm,items:[]});
+    const g=groups.get(id);if(!g.team&&tm)g.team=tm;
+    const name=col(o,'song');if(!name)continue;const s=byTitle[name.toLowerCase()];
+    g.items.push({songId:s?s.id:null,name,key:normKey(col(o,'key'))||(s?teamKey(s,g.team):''),note:col(o,'note','notes')});
+  }
+  sets=[...groups.values()];
+  const st=table(raw.settings);const ts=new Set();let church='';
+  st.forEach(o=>{const k=col(o,'setting').toLowerCase(),v=col(o,'value');if(k==='church name')church=v;if(k==='team'&&v)ts.add(v)});
+  sets.forEach(x=>x.team&&ts.add(x.team));
+  settings={church,teams:[...ts]};
+  hasData=true;
+}
+async function load(manual){
+  if(loading)return;loading=true;status(manual?'Refreshing…':hasData?'Checking for updates…':'Opening the songbook…');
+  try{
+    const get=async t=>{const r=await fetch(feed(t),{cache:'no-store'});if(!r.ok)throw new Error(r.status);const x=await r.text();if(/^\s*</.test(x))throw new Error('html');return x};
+    const [a,b,c]=await Promise.all([get('Songs'),get('Sets'),get('Settings').catch(()=>'')]);
+    const raw={songs:a,sets:b,settings:c,at:Date.now()};
+    build(raw);loadedAt=raw.at;store.set('ns-cache-'+SHEET,raw);status();
+    if(manual)toast('Songbook is up to date');
+  }catch(e){
+    status(hasData?'Showing the copy saved on this device. Couldn’t reach the sheet, so it may be out of date.':'Couldn’t open the songbook. Check your connection, and make sure the sheet is shared as “Anyone with the link: Viewer”.');
+  }
+  loading=false;paint();
+}
+function status(m){
+  if(m===undefined){const mins=Math.round((Date.now()-loadedAt)/60000);m=loadedAt?`${songs.length} songs · updated ${mins<1?'just now':mins<60?mins+' min ago':new Date(loadedAt).toLocaleString(undefined,{weekday:'short',hour:'numeric',minute:'2-digit'})}`:''}
+  $('#status').textContent=m;
+}
+
+/* ---------- Scripture ---------- */
+const BOOKS=['Genesis','Exodus','Leviticus','Numbers','Deuteronomy','Joshua','Judges','Ruth','1 Samuel','2 Samuel','1 Kings','2 Kings','1 Chronicles','2 Chronicles','Ezra','Nehemiah','Esther','Job','Psalms','Proverbs','Ecclesiastes','Song of Songs','Isaiah','Jeremiah','Lamentations','Ezekiel','Daniel','Hosea','Joel','Amos','Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah','Haggai','Zechariah','Malachi','Matthew','Mark','Luke','John','Acts','Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon','Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation'];
+const ALIAS={ps:'Psalms',psa:'Psalms',pss:'Psalms',psalm:'Psalms',jn:'John',jhn:'John',mt:'Matthew',mk:'Mark',mrk:'Mark',lk:'Luke',rm:'Romans',ro:'Romans',php:'Philippians',phil:'Philippians',phm:'Philemon',philem:'Philemon',jas:'James',jm:'James',jud:'Jude',re:'Revelation',revelations:'Revelation',ge:'Genesis',gn:'Genesis',ex:'Exodus',lv:'Leviticus',nu:'Numbers',dt:'Deuteronomy',jos:'Joshua',jdg:'Judges',jg:'Judges',ru:'Ruth',jb:'Job',pr:'Proverbs',prv:'Proverbs',ec:'Ecclesiastes',qoh:'Ecclesiastes',sos:'Song of Songs',song:'Song of Songs',songofsolomon:'Song of Songs',canticles:'Song of Songs',is:'Isaiah',jl:'Joel',am:'Amos',ob:'Obadiah',jnh:'Jonah',jon:'Jonah',mi:'Micah',na:'Nahum',zep:'Zephaniah',hg:'Haggai',zc:'Zechariah',ml:'Malachi',ezk:'Ezekiel',dn:'Daniel'};
+const bkey=b=>b.toLowerCase().replace(/[\s.]/g,'');
+function bookOf(raw){
+  const k=bkey(raw),m=k.match(/^([123])(.+)$/),num=m?m[1]:'',rest=m?m[2]:k;
+  if(rest.length<2)return null;
+  const cands=BOOKS.filter(b=>num?b.startsWith(num+' '):!/^\d/.test(b));
+  const strip=b=>bkey(num?b.slice(2):b);
+  if(ALIAS[rest]){const n=num?num+' '+ALIAS[rest]:ALIAS[rest];if(BOOKS.includes(n))return n}
+  const ex=cands.find(b=>strip(b)===rest);if(ex)return ex;
+  const pre=cands.filter(b=>strip(b).startsWith(rest));return pre.length===1?pre[0]:null;
+}
+function parseRefs(str){
+  const out=[];let last=null;
+  for(const piece of String(str||'').split(/;|,(?=\s*(?:[1-3]\s*)?[A-Za-z])/)){
+    const m=piece.match(/^\s*((?:[1-3]\s*)?[A-Za-z][A-Za-z.\s]*?)?\s*(\d+)?(?:\s*:\s*(\d+))?(?:\s*[-–]\s*(\d+)(?:\s*:\s*(\d+))?)?\s*$/);
+    if(!m)continue;
+    const b=m[1]?bookOf(m[1]):last;if(!b)continue;last=b;
+    const c1=m[2]?+m[2]:0,v1=m[3]?+m[3]:0;let c2=c1,v2=v1||999;
+    if(!m[2]){c2=999}else if(m[4]&&m[5]){c2=+m[4];v2=+m[5]}else if(m[4]&&m[3]){v2=+m[4]}else if(m[4]){c2=+m[4];v2=999}
+    out.push({b,s:c1*1000+v1,e:c2*1000+v2});
+  }
+  return out;
+}
+const refHit=(a,b)=>a.b===b.b&&a.s<=b.e&&b.s<=a.e;
+function matches(s){
+  if(!q)return true;
+  if(qRefs.length&&s.scripture){const r=parseRefs(s.scripture);if(r.some(x=>qRefs.some(y=>refHit(x,y))))return true}
+  const h=[s.title,s.author,s.ccli,s.scripture,s.tags.join(' '),String(s.chart||'').replace(/\[[^\]]*\]/g,'')].join(' ').toLowerCase();
+  return q.toLowerCase().split(/\s+/).every(w=>h.includes(w));
+}
+
+/* ---------- chords ---------- */
+function tChord(ch,d,fl,mode,key){
+  const m=ch.trim().match(/^([A-G][#b]?)([^\/]*)(?:\/([A-G][#b]?))?$/);if(!m)return ch;
+  const nm=r=>{const i=(N[r]+d+12)%12;return mode==='nash'?DEG[(i-idx(key)+12)%12]:(fl?FL:SH)[i]};
+  return nm(m[1])+m[2]+(m[3]?'/'+nm(m[3]):'');
+}
+const SECRX=/^(verse|chorus|pre-?chorus|bridge|tag|intro|outro|interlude|ending|instrumental|refrain|turnaround|vamp|coda)\b[^\[\]]*$/i;
+function chart(text,from,to,mode){
+  const d=(idx(to)-idx(from)+12)%12,fl=flats(to);
+  return String(text||'').split('\n').map(line=>{
+    const t=line.trim(),h=t.match(/^\{(?:c|comment|ci)\s*:\s*(.*)\}$/i);
+    if(h)return `<h4 class="sec">${esc(h[1])}</h4>`;
+    if(/^\{.*\}$/.test(t))return '';
+    if(SECRX.test(t)&&t.length<32)return `<h4 class="sec">${esc(t.replace(/:$/,''))}</h4>`;
+    if(!t)return '<div class="gap"></div>';
+    const p=line.split(/\[([^\]]*)\]/);
+    if(mode==='lyr'){const s=p.filter((_,i)=>i%2===0).join('').replace(/\s+/g,' ').trim();return s?`<p class="ln">${esc(s)}</p>`:''}
+    let out=p[0]?esc(p[0]):'';
+    for(let i=1;i<p.length;i+=2){const seg=p[i+1]||'',m=seg.match(/^(\S*\s?)([\s\S]*)$/);
+      out+=`<span class="w"><b>${esc(tChord(p[i],d,fl,mode,to))}</b>${m[1]?esc(m[1]):' '}</span>${esc(m[2])}`}
+    return `<p class="ln${p.length>1?' hc':''}">${out}</p>`;
+  }).join('');
+}
+
+/* ---------- importing charts (editors) ---------- */
+const CHORDTOK=/^\(?[A-G][#b]?(?:m|maj|min|dim|aug|sus|add|M)?\d*(?:(?:sus|add|maj|b|#)\d*)*(?:\/[A-G][#b]?)?\)?$/;
+const isChordLine=l=>{const t=l.trim().split(/\s+/).filter(Boolean);return t.length>0&&t.some(x=>CHORDTOK.test(x))&&t.every(x=>CHORDTOK.test(x)||/^(\||-|\/|N\.?C\.?|x\d+|\(x\d+\)|%)$/i.test(x))};
+function overToInline(lines){
+  const out=[];
+  for(let i=0;i<lines.length;i++){const l=lines[i];
+    if(isChordLine(l)&&!/^\{/.test(l.trim())){
+      const nx=lines[i+1],pos=[];l.replace(/\S+/g,(m,o)=>{if(CHORDTOK.test(m))pos.push([o,m.replace(/[()]/g,'')]);return m});
+      if(nx!==undefined&&nx.trim()&&!isChordLine(nx)&&!/^\{/.test(nx.trim())&&!SECRX.test(nx.trim())){
+        let lyr=nx;for(const [o,c] of pos.reverse()){if(lyr.length<o)lyr=lyr.padEnd(o);lyr=lyr.slice(0,o)+'['+c+']'+lyr.slice(o)}
+        out.push(lyr.replace(/\s+$/,''));i++;
+      }else out.push(pos.map(([,c])=>'['+c+']').join(' '));
+    }else out.push(l);
+  }
+  return out;
+}
+function parseSong(txt,fname){
+  const o={title:'',author:'',ccli:'',key:'',bpm:'',sig:'4/4',scripture:'',tags:'',arrangement:'',teamKeys:'',notes:'',links:'',chart:''};
+  const body=[],extra=[];let afterCcli=false;
+  for(const raw of String(txt).replace(/\r/g,'').replace(/\t/g,'    ').split('\n')){
+    const t=raw.trim(),d=t.match(/^\{\s*([a-z_]+)\s*(?::\s*([\s\S]*?))?\s*\}$/i);
+    if(d){const n=d[1].toLowerCase(),v=(d[2]||'').trim();
+      if(n==='title'||n==='t')o.title=o.title||v;
+      else if(['subtitle','st','artist','composer','lyricist','author'].includes(n)){if(v&&!o.author.includes(v))o.author=o.author?o.author+', '+v:v}
+      else if(n==='key')o.key=normKey(v);
+      else if(n==='tempo'||n==='bpm')o.bpm=parseInt(v)||'';
+      else if(n==='time')o.sig=v||'4/4';
+      else if(n.startsWith('ccli'))o.ccli=(v.match(/\d+/)||[''])[0];
+      else if(n==='copyright')extra.push('© '+v.replace(/^©\s*/,''));
+      else if(n==='keywords'||n==='tag')o.tags=v;
+      else if(n==='scripture')o.scripture=v;
+      else if(['c','comment','ci','comment_italic','cb'].includes(n))body.push('{c: '+v+'}');
+      else if(n==='soc'||n==='start_of_chorus')body.push(v||'Chorus');
+      else if(n==='sov'||n==='start_of_verse')body.push(v||'Verse');
+      else if(n==='sob'||n==='start_of_bridge')body.push(v||'Bridge');
+      continue;
+    }
+    const cc=t.match(/CCLI\s*Song\s*(?:#|No\.?|Number)?\s*:?\s*(\d+)/i);
+    if(cc){o.ccli=o.ccli||cc[1];afterCcli=true;continue}
+    if(/CCLI\s*Licen[cs]e|SongSelect|Terms of Use|^For use solely/i.test(t))continue;
+    if(/^(©|\(c\)|copyright\b)/i.test(t)){extra.push(t);continue}
+    if(afterCcli&&t){if(!o.author)o.author=t.replace(/\s*\|\s*/g,', ');afterCcli=false;continue}
+    body.push(raw);
+  }
+  let b=overToInline(body);
+  while(b.length&&!b[0].trim())b.shift();
+  if(!o.title&&b.length&&b[0].trim().length<70&&!/\[/.test(b[0])&&!SECRX.test(b[0].trim()))o.title=b.shift().trim();
+  if(!o.title)o.title=(fname||'Untitled').replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').trim();
+  while(b.length&&!b[b.length-1].trim())b.pop();
+  o.chart=b.join('\n');
+  if(!o.key){const m=o.chart.match(/\[([A-G][#b]?)(m(?!aj))?[^\]]*\]/);o.key=m?(m[2]?MIN[N[m[1]]]:MAJ[N[m[1]]]):'C'}
+  if(extra.length)o.notes=extra.join('\n');
+  return o;
+}
+const SHEETCOLS=['title','author','ccli','key','bpm','sig','scripture','tags','arrangement','teamKeys','chart','notes','links'];
+
+/* ---------- PDF ---------- */
+let pdfLib=null;
+function loadPdf(){
+  if(pdfLib)return pdfLib;
+  pdfLib=new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';s.onload=()=>ok(window.jspdf);s.onerror=()=>{pdfLib=null;no(new Error('load'))};document.head.appendChild(s)});
+  return pdfLib;
+}
+const clean=s=>String(s||'').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[–—]/g,'-').replace(/♭/g,'b').replace(/♯/g,'#').replace(/…/g,'...').replace(/[^\x00-\xFF]/g,'');
+async function makePdf(entries,{cover,mode}){
+  const {jsPDF}=await loadPdf();
+  const doc=new jsPDF({unit:'pt',format:'letter'}),W=612,H=792,M=54,MX=W-M,BLUE=[28,88,201];
+  let y=M,first=true,cur='';
+  const page=()=>{doc.addPage();y=M;if(cur){doc.setFont('helvetica','italic');doc.setFontSize(9);doc.setTextColor(120);doc.text(clean(cur)+' (continued)',M,y);y+=18}};
+  const need=h=>{if(y+h>H-M)page()};
+  const start=()=>{if(!first)doc.addPage();first=false;y=M};
+  if(cover){
+    start();
+    doc.setFont('times','bold');doc.setFontSize(26);doc.setTextColor(30);doc.text(clean(cover.title),M,y+10);y+=34;
+    doc.setFont('helvetica','normal');doc.setFontSize(12);doc.setTextColor(90);doc.text(clean(cover.sub),M,y);y+=30;
+    entries.forEach((en,i)=>{
+      need(40);doc.setFont('times','bold');doc.setFontSize(15);doc.setTextColor(30);doc.text(`${i+1}.  ${clean(en.s.title)}`,M,y);
+      doc.setFont('helvetica','bold');doc.setTextColor(...BLUE);doc.text(clean(en.key),MX,y,{align:'right'});y+=16;
+      const meta=[en.s.bpm&&en.s.bpm+' bpm',en.s.sig,en.s.arrangement].filter(Boolean).join('  ·  ');
+      doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(100);
+      if(meta){doc.text(doc.splitTextToSize(clean(meta),MX-M-20),M+20,y);y+=13}
+      if(en.note){doc.setFont('helvetica','italic');doc.text(doc.splitTextToSize(clean(en.note),MX-M-20),M+20,y);y+=13}
+      y+=12;
+    });
+    if(cover.notes){need(40);y+=6;doc.setFont('helvetica','normal');doc.setFontSize(11);doc.setTextColor(60);const t=doc.splitTextToSize(clean(cover.notes),MX-M);doc.text(t,M,y);y+=t.length*14}
+  }
+  for(const en of entries){
+    const s=en.s,capo=en.capo||0,shape=capo&&mode==='ch'?shiftKey(en.key,-capo):en.key;
+    start();cur=s.title;
+    doc.setFont('times','bold');doc.setFontSize(22);doc.setTextColor(30);doc.text(doc.splitTextToSize(clean(s.title),MX-M-70),M,y+8);
+    doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(...BLUE);doc.text(clean(en.key),MX,y+8,{align:'right'});y+=28;
+    doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(100);
+    const meta=[s.author,s.bpm&&s.bpm+' bpm',s.sig,s.ccli&&'CCLI '+s.ccli,capo&&mode==='ch'&&`Capo ${capo} (${shape} shapes)`].filter(Boolean).join('  ·  ');
+    if(meta){const t=doc.splitTextToSize(clean(meta),MX-M);doc.text(t,M,y);y+=t.length*12+2}
+    if(s.arrangement){doc.setFont('helvetica','bold');doc.setTextColor(60);const t=doc.splitTextToSize('Order: '+clean(s.arrangement),MX-M);doc.text(t,M,y);y+=t.length*12+2}
+    if(en.note){doc.setFont('helvetica','italic');doc.setTextColor(60);const t=doc.splitTextToSize(clean(en.note),MX-M);doc.text(t,M,y);y+=t.length*12+2}
+    doc.setDrawColor(210);doc.line(M,y+2,MX,y+2);y+=20;
+    const from=s.key||'C',to=mode==='ch'?shape:en.key,d=(idx(to)-idx(from)+12)%12,fl=flats(to);
+    for(const line of String(s.chart||'').split('\n')){
+      const t=line.trim(),h=t.match(/^\{(?:c|comment|ci)\s*:\s*(.*)\}$/i);
+      if(h||(SECRX.test(t)&&t.length<32)){need(40);y+=6;doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.setTextColor(110);doc.text(clean(h?h[1]:t.replace(/:$/,'')),M,y);y+=15;continue}
+      if(/^\{.*\}$/.test(t))continue;
+      if(!t){y+=8;continue}
+      const p=line.split(/\[([^\]]*)\]/);
+      if(mode==='lyr'){const s2=p.filter((_,i)=>i%2===0).join('').replace(/\s+/g,' ').trim();if(!s2)continue;doc.setFont('times','normal');doc.setFontSize(12.5);doc.setTextColor(25);for(const r of doc.splitTextToSize(clean(s2),MX-M)){need(17);doc.text(r,M,y);y+=17}continue}
+      const toks=[];
+      const push=(ch,txt)=>{const parts=txt?txt.split(/(?<=\s)/):[''];parts.forEach((w,i)=>toks.push({ch:i===0?ch:null,t:clean(w)}))};
+      if(p[0])push(null,p[0]);
+      for(let i=1;i<p.length;i+=2)push(clean(tChord(p[i],d,fl,mode,to)),p[i+1]||'');
+      let row=[],x=M,ce=M;const rows=[];
+      for(const tk of toks){
+        doc.setFont('times','normal');doc.setFontSize(12.5);const tw=doc.getTextWidth(tk.t);
+        doc.setFont('helvetica','bold');doc.setFontSize(10.5);const cw=tk.ch?doc.getTextWidth(tk.ch)+5:0;
+        let cx=tk.ch?Math.max(x,ce):x;
+        if(row.length&&cx+Math.max(tw,cw)>MX){rows.push(row);row=[];x=M;ce=M;cx=M}
+        row.push({...tk,x:cx});x=cx+tw;if(tk.ch)ce=cx+cw;
+      }
+      if(row.length)rows.push(row);
+      for(const r of rows){
+        const hc=r.some(z=>z.ch);need(hc?30:17);
+        if(hc){doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.setTextColor(...BLUE);r.forEach(z=>z.ch&&doc.text(z.ch,z.x,y));y+=13}
+        doc.setFont('times','normal');doc.setFontSize(12.5);doc.setTextColor(25);r.forEach(z=>z.t&&doc.text(z.t,z.x,y));y+=hc?17:16;
+      }
+    }
+    if(s.notes){need(40);y+=8;doc.setFont('helvetica','italic');doc.setFontSize(10);doc.setTextColor(90);const t=doc.splitTextToSize(clean(s.notes),MX-M);doc.text(t,M,y);y+=t.length*12}
+    cur='';
+  }
+  const n=doc.getNumberOfPages();
+  for(let i=1;i<=n;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(150);doc.text(`${i} / ${n}`,MX,H-28,{align:'right'})}
+  return doc.output('blob');
+}
+function saveFile(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name.replace(/[\\/:*?"<>|]/g,'-');document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)}
+async function offerPdf(entries,opts,name){
+  toast('Making PDF…');
+  try{saveFile(await makePdf(entries,opts),name+'.pdf')}catch(e){toast('Couldn’t make the PDF. Check your connection and try again.')}
+}
+
+/* ---------- metronome ---------- */
+let met=null,actx=null,sound=false;
+function stopMet(){clearInterval(met);met=null;sound=false}
+function startMet(bpm,beats,withSound){
+  stopMet();if(!bpm)return;sound=withSound;let n=0;
+  if(withSound){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){sound=false}}
+  met=setInterval(()=>{
+    const dot=$('#pulse');if(dot){dot.classList.toggle('one',n%beats===0);dot.classList.remove('on');void dot.offsetWidth;dot.classList.add('on')}
+    if(sound&&actx){const o=actx.createOscillator(),g=actx.createGain(),t=actx.currentTime;o.frequency.value=n%beats?900:1400;g.gain.setValueAtTime(.25,t);g.gain.exponentialRampToValueAtTime(.001,t+.08);o.connect(g).connect(actx.destination);o.start(t);o.stop(t+.09)}
+    n++;
+  },60000/bpm);
+}
+
+/* ---------- views ---------- */
+function usage(id){let last='',next='';for(const s of sets){if(!s.items.some(i=>i.songId===id))continue;if(s.date<today){if(s.date>last)last=s.date}else if(!next||s.date<next)next=s.date}return {last,next}}
+function paint(){
+  $('#church').textContent=settings.church?settings.church+' music ministry':'Music ministry songbook';
+  if(team&&!settings.teams.includes(team))team='';
+  $('#team').innerHTML=`<option value="">All teams</option>`+settings.teams.map(x=>`<option ${x===team?'selected':''}>${esc(x)}</option>`).join('');
+  route(true);
+}
+function render(){
+  document.querySelectorAll('.tabs button[data-v]').forEach(b=>b.setAttribute('aria-current',b.dataset.v===tab&&!(sel&&sel.type==='editors')));
+  document.body.classList.toggle('sel',!!sel);
+  renderList();if(!(sel&&sel.type==='editors'&&$('#ed-in')))renderDetail();
+}
+function renderList(){
+  const L=$('#list');
+  if(!hasData){L.innerHTML=`<p class="empty">${loading?'Opening the songbook…':'No songs to show yet.'}</p>`;return}
+  if(tab==='songs'||q){
+    const list=songs.filter(matches).sort((a,b)=>a.title.localeCompare(b.title));
+    if(!list.length){L.innerHTML=`<p class="empty">${songs.length?`No songs match “${esc(q)}”.`:'No songs in the sheet yet.'}</p>`;return}
+    L.innerHTML=`<div class="hd">${list.length} song${list.length>1?'s':''}${team?' · keys for '+esc(team):''}</div>`+list.map(s=>{const u=usage(s.id);
+      return `<a class="row" href="#song-${esc(s.id)}" aria-current="${!!(sel&&sel.type==='song'&&sel.id===s.id&&!sel.fromSet)}">
+        <span class="t">${esc(s.title)}</span>
+        <span class="k"><span class="key">${esc(teamKey(s))}</span><br><span class="meta">${s.bpm?esc(s.bpm)+' bpm · ':''}${esc(s.sig)}</span></span>
+        <span class="s">${qRefs.length&&s.scripture?esc(s.scripture)+' · ':''}${esc(s.author)}${u.next?' · next '+fmtDate(u.next,{month:'short',day:'numeric'}):u.last?' · last '+fmtDate(u.last,{month:'short',day:'numeric'}):''}</span></a>`}).join('');
+  }else{
+    const vis=sets.filter(s=>!team||s.team===team);
+    const up=vis.filter(s=>s.date>=today).sort((a,b)=>a.date.localeCompare(b.date)),past=vis.filter(s=>s.date<today).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,40);
+    const row=s=>`<a class="row" href="#set-${esc(s.id)}" aria-current="${!!(sel&&(sel.type==='set'&&sel.id===s.id||sel.fromSet===s.id))}">
+      <span class="t">${esc(fmtDate(s.date))}</span><span class="k meta">${s.items.length} song${s.items.length===1?'':'s'}</span>
+      <span class="s">${esc(s.title)}${s.team?' · '+esc(s.team):''}</span></a>`;
+    L.innerHTML=!vis.length?`<p class="empty">No sets${team?' for '+esc(team):''} yet. Add them on the Sets tab of the sheet.</p>`:
+      (up.length?`<div class="hd">Upcoming</div>`+up.map(row).join(''):'')+(past.length?`<div class="hd">Past</div>`+past.map(row).join(''):'');
+  }
+}
+function renderDetail(){
+  const D=$('#detail');
+  if(!sel){stopMet();const nx=sets.filter(s=>s.date>=today&&(!team||s.team===team)).sort((a,b)=>a.date.localeCompare(b.date))[0];
+    D.innerHTML=`<p class="empty">${tab==='sets'?(nx?`Next up: <a href="#set-${esc(nx.id)}">${esc(fmtDate(nx.date,{weekday:'long',month:'long',day:'numeric'}))}, ${esc(nx.title)}</a>.`:'Pick a set to see its songs, keys and order.'):'Pick a song to see its chart, key, tempo and arrangement.'}</p>`;return}
+  if(sel.type==='song')return songView(D);
+  if(sel.type==='set')return setView(D);
+  if(sel.type==='editors')return editorsView(D);
+}
+
+function songView(D){
+  const s=song(sel.id);if(!s){D.innerHTML=`<a class="btn ghost back" href="#">← Back</a><p class="empty">${sel.name?`“${esc(sel.name)}” isn’t on the Songs tab of the sheet yet, or its title is spelled differently.`:'This song isn’t in the songbook.'}</p>`;return}
+  if(!view.key)view.key=sel.key||teamKey(s);
+  const shape=view.capo?shiftKey(view.key,-view.capo):view.key,beats=parseInt(s.sig)||4;
+  const tks=Object.entries(s.teamKeys);
+  const links=String(s.links||'').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const [a,b]=l.includes('|')?l.split('|').map(x=>x.trim()):[l,l];return /^https?:\/\//i.test(b)?`<a href="${esc(b)}" target="_blank" rel="noopener">${esc(a===b?b.replace(/^https?:\/\/(www\.)?/,'').slice(0,40):a)}</a>`:''}).join('');
+  const st=sel.fromSet?setById(sel.fromSet):null,nxt=st&&st.items[sel.idx+1],prv=st&&st.items[sel.idx-1];
+  D.innerHTML=`${st?`<a class="btn ghost back" style="display:inline-flex" href="#set-${esc(st.id)}">← ${esc(fmtDate(st.date,{weekday:'short',month:'short',day:'numeric'}))} set</a>`:`<a class="btn ghost back" href="#">← All songs</a>`}
+  <div class="top"><div><h2>${esc(s.title)}</h2><p class="by">${esc(s.author)}${s.ccli?' · CCLI '+esc(s.ccli):''}${st?` · song ${sel.idx+1} of ${st.items.length}`:''}</p></div>
+  <div class="acts"><button data-act="pdf-song">PDF</button></div></div>
+  ${sel.note?`<div class="notes" style="margin-top:12px">${esc(sel.note)}</div>`:''}
+  <div class="facts">
+    <div><small>Chart key</small><strong>${esc(s.key)}</strong></div>
+    <div><small>Playing in</small><strong style="color:var(--chord)">${esc(view.key)}</strong></div>
+    <div><small>Tempo <span id="pulse"></span></small><strong>${s.bpm?esc(s.bpm)+' bpm':'—'}</strong></div>
+    <div><small>Time</small><strong>${esc(s.sig)}</strong></div>
+  </div>
+  ${s.scripture?`<div>${String(s.scripture).split(';').map(r=>r.trim()).filter(Boolean).map(r=>`<button class="ref" data-act="ref" data-r="${esc(r)}">${esc(r)}</button>`).join('')}</div>`:''}
+  ${tks.length?`<div class="tk">${tks.map(([t,k])=>`<span>${esc(t)}: <b>${esc(k)}</b></span>`).join('')}</div>`:''}
+  ${s.arrangement?`<label>Arrangement</label><div class="arr">${s.arrangement.split(/[\s,]+/).filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('')}</div>`:''}
+  <div class="tools" role="toolbar" aria-label="Chart tools">
+    <button data-act="tr" data-d="-1" aria-label="Down a half step">♭ −</button>
+    <select id="vkey" aria-label="Key">${keyOpts(view.key)}</select>
+    <button data-act="tr" data-d="1" aria-label="Up a half step">♯ +</button>
+    <select id="capo" aria-label="Capo">${[0,1,2,3,4,5,6,7].map(c=>`<option value="${c}" ${c==view.capo?'selected':''}>${c?'Capo '+c:'No capo'}</option>`).join('')}</select>
+    <span class="sep"></span>
+    <span class="seg">${[['ch','Chords'],['nash','Numbers'],['lyr','Lyrics']].map(([m,l])=>`<button data-act="mode" data-m="${m}" aria-pressed="${view.mode===m}">${l}</button>`).join('')}</span>
+    <span class="sep"></span>
+    <button data-act="size" data-d="-2" aria-label="Smaller text">A−</button><button data-act="size" data-d="2" aria-label="Larger text">A+</button>
+    ${s.bpm?`<span class="sep"></span><button data-act="met" data-s="0" aria-pressed="${!!met&&!sound}">Pulse</button><button data-act="met" data-s="1" aria-pressed="${!!met&&sound}">Click</button>`:''}
+  </div>
+  ${view.capo&&view.mode==='ch'?`<p class="capo">Capo ${view.capo}: chords below are ${esc(shape)} shapes, sounding in ${esc(view.key)}.</p>`:''}
+  <div class="chart" style="--cs:${view.size}px">${s.chart?chart(s.chart,s.key,view.mode==='ch'?shape:view.key,view.mode):'<p class="empty" style="padding:0">No chart yet. Add one in the Chart column of the sheet.</p>'}</div>
+  ${s.notes?`<div class="notes">${esc(s.notes)}</div>`:''}
+  ${links?`<label>Links</label><p class="links">${links}</p>`:''}
+  ${s.tags.length?`<p class="help">Tags: ${esc(s.tags.join(', '))}</p>`:''}
+  ${st?`<div class="nextsong">${prv?`<a class="btn" href="#set-${esc(st.id)}/${sel.idx-1}">← ${esc(prv.name)}</a>`:'<span></span>'}${nxt?`<a class="btn pri" href="#set-${esc(st.id)}/${sel.idx+1}">Next: ${esc(nxt.name)} →</a>`:''}</div>`:''}`;
+  $('#vkey').onchange=e=>{view.key=e.target.value;songView(D)};
+  $('#capo').onchange=e=>{view.capo=+e.target.value;songView(D)};
+  if(met)startMet(+s.bpm,beats,sound);
+}
+function setText(st){
+  return `${st.title} · ${fmtDate(st.date)}${st.team?'\n'+st.team:''}\n\n`+st.items.map((it,i)=>{const s=song(it.songId)||{title:it.name};
+    return `${i+1}. ${s.title} (${it.key||s.key||''}${s.bpm?', '+s.bpm+' bpm':''}${s.sig?', '+s.sig:''})${s.arrangement?'\n   '+s.arrangement:''}${it.note?'\n   '+it.note:''}`}).join('\n')+`\n\n${location.href.split('#')[0]}#set-${st.id}`;
+}
+function setView(D){
+  stopMet();
+  const st=setById(sel.id);if(!st){D.innerHTML=`<a class="btn ghost back" href="#">← Back</a><p class="empty">This set isn’t in the sheet any more.</p>`;return}
+  D.innerHTML=`<a class="btn ghost back" href="#">← All sets</a>
+  <div class="top"><div><h2>${esc(fmtDate(st.date,{weekday:'long',month:'long',day:'numeric'}))}</h2><p class="by">${esc(st.title)}${st.team?' · '+esc(st.team):''}</p></div>
+  <div class="acts"><span class="seg"><select id="pdfmode" aria-label="PDF style"><option value="ch">Chords</option><option value="nash">Numbers</option><option value="lyr">Lyrics</option></select><button data-act="pdf-set" style="border-left:1px solid var(--line)">PDF</button></span><button data-act="copyset">Copy for a text</button></div></div>
+  <div style="margin-top:16px">${st.items.map((it,i)=>{const s=song(it.songId);
+    return `<div class="item"><span class="n">${i+1}</span>
+      <a class="row" href="#set-${esc(st.id)}/${i}">
+        <span class="t">${esc(s?s.title:it.name)}</span>
+        <span class="s">${s?[s.bpm&&s.bpm+' bpm',s.sig,s.arrangement].filter(Boolean).map(esc).join(' · '):'Not on the Songs tab yet'}${it.note?'<br>'+esc(it.note):''}</span>
+      </a><span class="key">${esc(it.key||(s&&s.key)||'')}</span></div>`}).join('')||'<p class="empty">No songs in this set yet.</p>'}</div>
+  ${st.items.length?`<div class="nextsong"><span></span><a class="btn pri" href="#set-${esc(st.id)}/0">Start with ${esc(st.items[0].name)} →</a></div>`:''}`;
+}
+
+/* ---------- editors ---------- */
+let imp=[];
+function editorsView(D){
+  stopMet();
+  D.innerHTML=`<a class="btn ghost back" href="#">← Back</a>
+  <h2>For editors</h2>
+  <p class="by">Everything in this songbook comes from one Google Sheet. Change the sheet, and the band sees it the next time they open or refresh this page.</p>
+  <div class="acts" style="margin-top:16px"><a class="btn pri" href="${esc(SHEET_URL)}" target="_blank" rel="noopener">Open the songbook sheet</a></div>
+  <ol class="steps">
+    <li><b>Songs tab:</b> one row per song. Key is the key the chart is written in. Scripture references go in one cell, separated by semicolons.</li>
+    <li><b>Sets tab:</b> one row per song, in playing order. Rows with the same Date and Service make one set. Pick the song from the dropdown so the title matches exactly.</li>
+    <li><b>Team keys:</b> in the Songs tab, write <code>Youth=A; Wednesday Night=C</code>.</li>
+  </ol>
+  <h3>Chart helper</h3>
+  <p class="help">Paste a chart with chords above the lyrics, or with chords in brackets. Copy the result into the song’s Chart cell.</p>
+  <div class="two">
+    <div><label for="ed-in">Paste here</label><textarea id="ed-in" class="mono" style="min-height:260px" placeholder="Verse 1&#10;     G          C       G&#10;Amazing grace, how sweet the sound"></textarea></div>
+    <div><label>Preview</label><div id="ed-pv" class="chart" style="--cs:17px;max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px 12px"></div></div>
+  </div>
+  <div class="acts" style="margin-top:12px"><button class="pri" data-act="ed-copy">Copy for the Chart cell</button><span class="help" id="ed-key"></span></div>
+  <h3>Add many songs at once</h3>
+  <p class="help">Choose ChordPro (.cho, .pro) or text chord charts, such as SongSelect downloads. You get rows to paste into the Songs tab.</p>
+  <label for="imp-files">Chart files</label><input id="imp-files" type="file" multiple accept=".cho,.chordpro,.chopro,.crd,.pro,.txt">
+  <div id="imp-pv"></div>`;
+  const inp=$('#ed-in'),upd=()=>{const o=parseSong('{title: x}\n'+inp.value);$('#ed-pv').innerHTML=o.chart?chart(o.chart,o.key,o.key,'ch'):'<p class="help">The preview shows here.</p>';$('#ed-key').textContent=o.chart?'Looks like the key of '+o.key+'.':''};
+  inp.oninput=upd;upd();
+  $('#imp-files').onchange=async e=>{imp=[];for(const f of e.target.files){const t=await f.text();t.split(/^\s*\{\s*(?:new_song|ns)\s*\}\s*$/im).filter(x=>x.trim()).forEach(x=>imp.push(parseSong(x,f.name)))}
+    const dup=o=>songs.some(s=>s.title.toLowerCase()===o.title.toLowerCase()||(o.ccli&&s.ccli===o.ccli));imp.forEach(o=>{o.dup=dup(o);o.on=!o.dup});impList()};
+}
+function impList(){
+  const P=$('#imp-pv');if(!P)return;
+  if(!imp.length){P.innerHTML='<p class="help">No songs found in those files.</p>';return}
+  const n=imp.filter(o=>o.on).length;
+  P.innerHTML=`<label>${imp.length} song${imp.length>1?'s':''} found</label>`+imp.map((o,i)=>`<div class="pv"><input type="checkbox" data-pi="${i}" ${o.on?'checked':''} aria-label="Include ${esc(o.title)}"><div><strong>${esc(o.title)}</strong> <span class="key" style="font-size:13px;min-width:0">${esc(o.key)}</span><small>${esc([o.author,o.ccli&&'CCLI '+o.ccli,(o.chart.match(/\[/g)||[]).length+' chords'].filter(Boolean).join(' · '))}</small>${o.dup?'<small class="dup">Already in the songbook</small>':''}</div></div>`).join('')+
+  `<div class="acts" style="margin-top:16px"><button class="pri" data-act="imp-copy">Copy ${n} rows</button><button data-act="imp-csv">Download ${n} rows as CSV</button></div>
+  <p class="help">Then, in the sheet: click the first empty cell in column A of the Songs tab and paste. Or use File › Import › Upload, and choose “Append to current sheet”.</p>`;
+}
+async function copyRich(html,text){
+  try{if(window.ClipboardItem&&navigator.clipboard.write){await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([text],{type:'text/plain'})})]);return true}}catch(e){}
+  try{await navigator.clipboard.writeText(text);return true}catch(e){return false}
+}
+
+/* ---------- routing ---------- */
+function route(keep){
+  const h=decodeURIComponent(location.hash.slice(1));let next=null;
+  if(h.startsWith('song-')){next={type:'song',id:h.slice(5)};if(!q)tab='songs'}
+  else if(h.startsWith('set-')){const [sid,i]=h.slice(4).split('/');const st=setById(sid);
+    if(i!==undefined&&st&&st.items[+i]){const it=st.items[+i];next={type:'song',id:it.songId,name:it.name,key:it.key,note:it.note,fromSet:sid,idx:+i}}else next={type:'set',id:sid};tab='sets'}
+  else if(h==='editors')next={type:'editors'};
+  const same=keep&&sel&&next&&sel.type===next.type&&sel.id===next.id&&sel.idx===next.idx;
+  if(!same){view.key=null;view.capo=0;stopMet()}
+  sel=next;render();
+  if(!same&&next&&next.type!=='editors')window.scrollTo(0,innerWidth<900?0:scrollY);
+}
+addEventListener('hashchange',()=>route(false));
+
+/* ---------- events ---------- */
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const a=b.dataset.act,D=$('#detail');
+  if(a==='tab'){tab=b.dataset.v;q='';qRefs=[];$('#q').value='';if(location.hash)location.hash='';else render()}
+  else if(a==='editors')location.hash='editors';
+  else if(a==='refresh')load(true);
+  else if(a==='tr'){view.key=shiftKey(view.key,+b.dataset.d);songView(D)}
+  else if(a==='mode'){view.mode=b.dataset.m;remember();songView(D)}
+  else if(a==='size'){view.size=Math.max(14,Math.min(40,view.size+ +b.dataset.d));remember();D.querySelector('.chart').style.setProperty('--cs',view.size+'px')}
+  else if(a==='met'){const s=song(sel.id),ws=b.dataset.s==='1';if(met&&sound===ws)stopMet();else startMet(+s.bpm,parseInt(s.sig)||4,ws);D.querySelectorAll('[data-act=met]').forEach(x=>x.setAttribute('aria-pressed',!!met&&(x.dataset.s==='1')===sound))}
+  else if(a==='ref'){q=b.dataset.r;$('#q').value=q;qRefs=parseRefs(q);tab='songs';renderList();if(innerWidth<900){sel=null;history.pushState(null,'',location.pathname+location.search);render()}toast('Songs on '+q)}
+  else if(a==='pdf-song'){const s=song(sel.id);offerPdf([{s,key:view.key,capo:view.capo,note:sel.note||''}],{mode:view.mode},`${s.title} (${view.key})`)}
+  else if(a==='pdf-set'){const st=setById(sel.id),mode=$('#pdfmode').value;
+    const entries=st.items.map(it=>({s:song(it.songId),key:it.key,note:it.note})).filter(x=>x.s).map(x=>({...x,key:x.key||x.s.key}));
+    if(!entries.length){toast('None of these songs have charts yet.');return}
+    offerPdf(entries,{mode,cover:{title:st.title,sub:[fmtDate(st.date,{weekday:'long',month:'long',day:'numeric',year:'numeric'}),st.team].filter(Boolean).join('  ·  ')}},`${st.date} ${st.title}`)}
+  else if(a==='copyset'){const txt=setText(setById(sel.id));try{await navigator.clipboard.writeText(txt);toast('Copied. Paste it into a text to the team.')}catch(err){D.insertAdjacentHTML('beforeend',`<label>Select and copy</label><textarea readonly style="min-height:200px">${esc(txt)}</textarea>`);D.querySelector('textarea[readonly]').select()}}
+  else if(a==='ed-copy'){const o=parseSong('{title: x}\n'+$('#ed-in').value);if(!o.chart){toast('Paste a chart first.');return}toast(await copyRich(`<table><tr><td>${esc(o.chart).replace(/\n/g,'<br>')}</td></tr></table>`,o.chart)?'Copied. Paste it into the Chart cell.':'Couldn’t copy. Select the text and copy it yourself.')}
+  else if(a==='imp-copy'||a==='imp-csv'){
+    const rows=imp.filter(o=>o.on);if(!rows.length){toast('Tick at least one song.');return}
+    if(a==='imp-csv'){const q2=v=>'"'+String(v??'').replace(/"/g,'""')+'"';saveFile(new Blob([rows.map(o=>SHEETCOLS.map(k=>q2(o[k])).join(',')).join('\n')],{type:'text/csv'}),'songs-to-add.csv');return}
+    const html='<table>'+rows.map(o=>'<tr>'+SHEETCOLS.map(k=>`<td>${esc(o[k]).replace(/\n/g,'<br>')}</td>`).join('')+'</tr>').join('')+'</table>';
+    const text=rows.map(o=>SHEETCOLS.map(k=>String(o[k]??'').replace(/\t/g,' ').includes('\n')?'"'+String(o[k]).replace(/"/g,'""')+'"':String(o[k]??'')).join('\t')).join('\n');
+    toast(await copyRich(html,text)?`Copied ${rows.length} rows. Paste into the Songs tab.`:'Couldn’t copy. Use the CSV download instead.');
+  }
+});
+document.addEventListener('change',e=>{const i=e.target.dataset.pi;if(i===undefined)return;imp[+i].on=e.target.checked;impList()});
+$('#q').addEventListener('input',e=>{q=e.target.value.trim();qRefs=parseRefs(q);render()});
+$('#team').addEventListener('change',e=>{team=e.target.value;remember();if(sel&&sel.type==='song'&&!sel.key)view.key=null;render()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-loadedAt>120000)load()});
+
+/* ---------- start ---------- */
+const cached=store.get('ns-cache-'+SHEET);
+if(cached){build(cached);loadedAt=cached.at;paint();status()}else route(true);
+load();
+setInterval(()=>{if(!loading&&loadedAt)status()},60000);
+}
+</script>
+</body>
+</html>
