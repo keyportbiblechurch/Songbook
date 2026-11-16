@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#5b1526">
+<meta name="robots" content="noindex, nofollow">
 <title>New Song Songbook</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
@@ -99,6 +100,9 @@ h2{font-size:clamp(28px,4vw,42px)}
 .dup{color:var(--danger)}
 ol.steps{padding-left:22px}ol.steps li{margin:6px 0}
 code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:.92em}
+#gate{padding:clamp(28px,6vw,72px) max(5vw,16px);max-width:520px}
+body.gated .bar,body.gated main,body.gated .tabs{display:none}
+.notice{margin-top:24px;padding-top:10px;border-top:1px solid var(--line)}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
 #toast.show{opacity:1}
 @media(max-width:900px){.wrap{grid-template-columns:minmax(0,1fr)}#list{border-right:0}body.sel #list{display:none}body:not(.sel) #detail{display:none}.back{display:inline-flex}}
@@ -118,10 +122,22 @@ code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:.92em}
     <button data-act="editors">For editors</button>
   </nav>
 </header>
+<section id="gate" hidden>
+  <form id="gate-f">
+    <h2>Team songbook</h2>
+    <p class="by">Charts and set lists for our music teams. Enter the passcode your worship leader gave you.</p>
+    <label for="gate-p">Passcode</label>
+    <input id="gate-p" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" required>
+    <p id="gate-msg" class="help" role="alert"></p>
+    <button class="pri" type="submit" style="margin-top:12px">Open songbook</button>
+    <p class="help">This device will remember the passcode until you tap Lock.</p>
+  </form>
+</section>
 <div class="bar">
   <input id="q" type="search" placeholder="Search titles, lyrics, tags or Scripture (Ps 23, Rev 4:8)" aria-label="Search songs">
   <select id="team" aria-label="Team"></select>
   <button data-act="refresh" aria-label="Refresh from the songbook sheet">↻ Refresh</button>
+  <button data-act="lock" aria-label="Lock the songbook on this device">Lock</button>
   <span id="status" role="status"></span>
 </div>
 <main class="wrap">
@@ -130,10 +146,11 @@ code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:.92em}
 </main>
 <div id="toast" role="status"></div>
 <script>
-/* ===== Settings: the Google Sheet this songbook reads. =====
-   Another church can use this same page with their own copy of the sheet:
-   add ?sheet=THEIR_SHEET_ID to the address, or change the ID below. */
-const DEFAULT_SHEET_ID='1ivlzwVRwPJXo3SxhO4h9t5-BdzVkABOINMehsgzmcw8';
+/* ===== Settings: your songbook's private web app. =====
+   Paste the Web app URL from Apps Script (Deploy > Manage deployments) between the quotes.
+   It looks like https://script.google.com/macros/s/..../exec
+   Another church can use this same page with their own sheet by adding ?api=THEIR_WEB_APP_URL to the address. */
+const DEFAULT_API='https://script.google.com/macros/s/AKfycbyqiTp5lwfBnS7oY6R3NshYRO87lkEHSGte8Je1E3X1bQV6vGHKDyjb4ZoUeGNe9BAFAg/exec';
 {
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -154,20 +171,22 @@ const slug=s=>String(s||'').toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g,
 function normKey(k){const m=String(k||'').trim().match(/^([A-Ga-g])\s*([#b♯♭])?\s*(m(?!aj)|min|minor)?/);if(!m)return '';const r=m[1].toUpperCase()+(m[2]?m[2].replace('♯','#').replace('♭','b'):'');const i=N[r];if(i===undefined)return '';return m[3]?MIN[i]:MAJ[i]}
 
 const params=new URLSearchParams(location.search);
-const SHEET=(params.get('sheet')||DEFAULT_SHEET_ID).trim();
-const SHEET_URL=`https://docs.google.com/spreadsheets/d/${encodeURIComponent(SHEET)}/edit`;
-const feed=tab=>`https://docs.google.com/spreadsheets/d/${encodeURIComponent(SHEET)}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(tab)}`;
+const API=(params.get('api')||DEFAULT_API).trim();
+const KEYP='ns-pass-'+API,KEYC='ns-data-'+API;
+let SHEET_URL='',gated=false;
 
 let songs=[],sets=[],settings={church:'',teams:[]},loadedAt=0,loading=false,hasData=false;
 let tab='sets',sel=null,team='',q='',qRefs=[];
 let view={key:null,capo:0,mode:'ch',size:19};
-const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+try{Object.keys(localStorage).filter(k=>k.startsWith('ns-cache-')).forEach(k=>localStorage.removeItem(k))}catch(e){}
 {const v=store.get('ns-view')||{};if(v.size)view.size=v.size;if(v.mode)view.mode=v.mode;team=store.get('ns-team')||''}
 const remember=()=>{store.set('ns-view',{size:view.size,mode:view.mode});store.set('ns-team',team)};
 const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('show'),2600)};
 const song=id=>songs.find(s=>s.id===id);
 const setById=id=>sets.find(s=>s.id===id);
-const teamKey=(s,t=team)=>(t&&s.teamKeys&&s.teamKeys[t])||s.key||'C';
+const teamKey=(s,t=team)=>(t&&s.teamKeys&&s.teamKeys[t])||s.key||'';
+const guessKey=c=>{const m=String(c||'').match(/\[([A-G][#b]?)(m(?!aj))?[^\]]*\]/);return m&&N[m[1]]!==undefined?(m[2]?MIN[N[m[1]]]:MAJ[N[m[1]]]):''};
 
 /* ---------- reading the sheet ---------- */
 function csvRows(txt){
@@ -178,12 +197,12 @@ function csvRows(txt){
   if(f||row.length){row.push(f);rows.push(row)}
   return rows;
 }
-function table(txt){
-  const rows=csvRows(txt||'');const hd=(rows.shift()||[]).map(h=>h.trim().toLowerCase());
+function table(src){
+  const rows=Array.isArray(src)?src.map(r=>r.map(x=>String(x??''))):csvRows(src||'');const hd=(rows.shift()||[]).map(h=>h.trim().toLowerCase());
   return rows.filter(r=>r.some(x=>x.trim())).map(r=>{const o={};hd.forEach((h,i)=>o[h]=(r[i]||'').trim());return o});
 }
 const col=(o,...names)=>{for(const n of names){if(o[n]!==undefined&&o[n]!=='')return o[n]}return ''};
-function fixSig(v){v=String(v||'').trim();const m=v.match(/^(\d{1,2})\/(\d{1,2})\/\d{2,4}$/);if(m)return `${+m[1]}/${+m[2]}`;const d=v.match(/^\d{4}-(\d{2})-(\d{2})$/);if(d)return `${+d[1]}/${+d[2]}`;return v||'4/4'}
+function fixSig(v){v=String(v||'').trim();const m=v.match(/^(\d{1,2})\/(\d{1,2})\/\d{2,4}$/);if(m)return `${+m[1]}/${+m[2]}`;const d=v.match(/^\d{4}-(\d{2})-(\d{2})$/);if(d)return `${+d[1]}/${+d[2]}`;return v}
 function fixDate(v){v=String(v||'').trim();let m;
   if(m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
   if(m=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/))return `${m[3].length===2?'20'+m[3]:m[3]}-${pad(m[1])}-${pad(m[2])}`;
@@ -193,8 +212,8 @@ function build(raw){
   songs=table(raw.songs).filter(o=>col(o,'title','song')).map(o=>{
     const title=col(o,'title','song');let id=slug(title);if(used[id])id+='-'+(++used[id]);else used[id]=1;
     const tk={};col(o,'team keys').split(/[;\n]/).forEach(p=>{const m=p.split('=');if(m.length===2&&normKey(m[1]))tk[m[0].trim()]=normKey(m[1])});
-    return {id,title,author:col(o,'author','artist'),ccli:(col(o,'ccli').match(/\d+/)||[''])[0],key:normKey(col(o,'key'))||'C',bpm:parseInt(col(o,'bpm','tempo'))||null,sig:fixSig(col(o,'time','meter')),
-      scripture:col(o,'scripture'),tags:col(o,'tags').split(',').map(x=>x.trim()).filter(Boolean),arrangement:col(o,'arrangement','order'),teamKeys:tk,chart:col(o,'chart','lyrics'),notes:col(o,'notes'),links:col(o,'links')};
+    return {id,title,author:col(o,'author','artist'),ccli:(col(o,'ccli').match(/\d+/)||[''])[0],key:normKey(col(o,'key'))||guessKey(col(o,'chart','lyrics')),bpm:parseInt(col(o,'bpm','tempo'))||null,sig:fixSig(col(o,'time','meter')),
+      scripture:col(o,'scripture'),tags:col(o,'tags').split(',').map(x=>x.trim()).filter(Boolean),arrangement:col(o,'arrangement','order'),teamKeys:tk,chart:col(o,'chart','lyrics'),notes:col(o,'notes'),links:col(o,'links'),copyright:col(o,'copyright')};
   });
   const byTitle={};songs.forEach(s=>{byTitle[s.title.toLowerCase()]=byTitle[s.title.toLowerCase()]||s});
   const groups=new Map();
@@ -207,25 +226,43 @@ function build(raw){
     g.items.push({songId:s?s.id:null,name,key:normKey(col(o,'key'))||(s?teamKey(s,g.team):''),note:col(o,'note','notes')});
   }
   sets=[...groups.values()];
-  const st=table(raw.settings);const ts=new Set();let church='';
-  st.forEach(o=>{const k=col(o,'setting').toLowerCase(),v=col(o,'value');if(k==='church name')church=v;if(k==='team'&&v)ts.add(v)});
+  const st=table(raw.settings);const ts=new Set();let church='',license='';
+  st.forEach(o=>{const k=col(o,'setting').toLowerCase(),v=col(o,'value');if(k==='church name')church=v;if(k==='team'&&v)ts.add(v);if(k.startsWith('ccli'))license=(v.match(/\d+/)||[''])[0]});
   sets.forEach(x=>x.team&&ts.add(x.team));
-  settings={church,teams:[...ts]};
+  settings={church,teams:[...ts],license};SHEET_URL=raw.sheetUrl||'';
   hasData=true;
 }
 async function load(manual){
+  if(!API){showGate('setup');return}
+  const pass=store.get(KEYP);
+  if(!pass){showGate();return}
   if(loading)return;loading=true;status(manual?'Refreshing…':hasData?'Checking for updates…':'Opening the songbook…');
   try{
-    const get=async t=>{const r=await fetch(feed(t),{cache:'no-store'});if(!r.ok)throw new Error(r.status);const x=await r.text();if(/^\s*</.test(x))throw new Error('html');return x};
-    const [a,b,c]=await Promise.all([get('Songs'),get('Sets'),get('Settings').catch(()=>'')]);
-    const raw={songs:a,sets:b,settings:c,at:Date.now()};
-    build(raw);loadedAt=raw.at;store.set('ns-cache-'+SHEET,raw);status();
+    const r=await fetch(API,{method:'POST',body:JSON.stringify({pass}),headers:{'Content-Type':'text/plain;charset=utf-8'},cache:'no-store',redirect:'follow'});
+    const j=await r.json();
+    if(!j.ok){
+      loading=false;
+      if(j.error==='passcode'){lock();showGate('wrong');return}
+      if(j.error==='setup'){showGate('admin',j.message);return}
+      if(j.error==='locked'){if(hasData){status(j.message);paint()}else showGate('locked',j.message);return}
+      throw new Error(j.error||'bad');
+    }
+    build(j);loadedAt=j.at;store.set(KEYC,j);gated=false;document.body.classList.remove('gated');$('#gate').hidden=true;status();
     if(manual)toast('Songbook is up to date');
   }catch(e){
-    status(hasData?'Showing the copy saved on this device. Couldn’t reach the sheet, so it may be out of date.':'Couldn’t open the songbook. Check your connection, and make sure the sheet is shared as “Anyone with the link: Viewer”.');
+    status(hasData?'Showing the copy saved on this device. Couldn’t reach the songbook, so it may be out of date.':'Couldn’t reach the songbook. Check your connection and try again.');
+    if(!hasData)showGate('offline');
   }
   loading=false;paint();
 }
+const GATEMSG={wrong:'That passcode didn’t work. Check it with your worship leader.',offline:'Couldn’t reach the songbook. Check your connection and try again.',setup:'This page isn’t connected to a songbook yet. Editors: see “Make it private” in the README.'};
+function showGate(why,msg){
+  gated=true;document.body.classList.add('gated');$('#gate').hidden=false;
+  $('#gate-msg').textContent=msg||GATEMSG[why]||'';
+  const f=$('#gate-f');f.querySelector('input').disabled=why==='setup';f.querySelector('button').disabled=why==='setup';
+  if(why!=='setup')setTimeout(()=>$('#gate-p').focus(),50);
+}
+function lock(){store.del(KEYP);store.del(KEYC);songs=[];sets=[];hasData=false;loadedAt=0;SHEET_URL='';sel=null;status('')}
 function status(m){
   if(m===undefined){const mins=Math.round((Date.now()-loadedAt)/60000);m=loadedAt?`${songs.length} songs · updated ${mins<1?'just now':mins<60?mins+' min ago':new Date(loadedAt).toLocaleString(undefined,{weekday:'short',hour:'numeric',minute:'2-digit'})}`:''}
   $('#status').textContent=m;
@@ -259,7 +296,7 @@ function parseRefs(str){
 const refHit=(a,b)=>a.b===b.b&&a.s<=b.e&&b.s<=a.e;
 function matches(s){
   if(!q)return true;
-  if(qRefs.length&&s.scripture){const r=parseRefs(s.scripture);if(r.some(x=>qRefs.some(y=>refHit(x,y))))return true}
+  if(qRefs.length){const r=s.scripture?parseRefs(s.scripture):[];if(r.some(x=>qRefs.some(y=>refHit(x,y))))return true;if(/\d/.test(q))return false}
   const h=[s.title,s.author,s.ccli,s.scripture,s.tags.join(' '),String(s.chart||'').replace(/\[[^\]]*\]/g,'')].join(' ').toLowerCase();
   return q.toLowerCase().split(/\s+/).every(w=>h.includes(w));
 }
@@ -305,7 +342,7 @@ function overToInline(lines){
   return out;
 }
 function parseSong(txt,fname){
-  const o={title:'',author:'',ccli:'',key:'',bpm:'',sig:'4/4',scripture:'',tags:'',arrangement:'',teamKeys:'',notes:'',links:'',chart:''};
+  const o={title:'',author:'',ccli:'',key:'',bpm:'',sig:'4/4',scripture:'',tags:'',arrangement:'',teamKeys:'',notes:'',links:'',chart:'',copyright:''};
   const body=[],extra=[];let afterCcli=false;
   for(const raw of String(txt).replace(/\r/g,'').replace(/\t/g,'    ').split('\n')){
     const t=raw.trim(),d=t.match(/^\{\s*([a-z_]+)\s*(?::\s*([\s\S]*?))?\s*\}$/i);
@@ -339,10 +376,11 @@ function parseSong(txt,fname){
   while(b.length&&!b[b.length-1].trim())b.pop();
   o.chart=b.join('\n');
   if(!o.key){const m=o.chart.match(/\[([A-G][#b]?)(m(?!aj))?[^\]]*\]/);o.key=m?(m[2]?MIN[N[m[1]]]:MAJ[N[m[1]]]):'C'}
-  if(extra.length)o.notes=extra.join('\n');
+  if(extra.length)o.copyright=extra.join(' ');
   return o;
 }
-const SHEETCOLS=['title','author','ccli','key','bpm','sig','scripture','tags','arrangement','teamKeys','chart','notes','links'];
+const SHEETCOLS=['title','author','ccli','key','bpm','sig','scripture','tags','arrangement','teamKeys','chart','notes','links','copyright'];
+function notice(s){if(!s||!(s.ccli||s.copyright))return '';return [`“${s.title}”`+(s.author?` words and music by ${s.author}`:''),s.copyright,settings.license?`CCLI License # ${settings.license}`:''].filter(Boolean).join(' · ')}
 
 /* ---------- PDF ---------- */
 let pdfLib=null;
@@ -413,6 +451,7 @@ async function makePdf(entries,{cover,mode}){
       }
     }
     if(s.notes){need(40);y+=8;doc.setFont('helvetica','italic');doc.setFontSize(10);doc.setTextColor(90);const t=doc.splitTextToSize(clean(s.notes),MX-M);doc.text(t,M,y);y+=t.length*12}
+    const nt=notice(s);if(nt){need(30);y+=12;doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(110);const t=doc.splitTextToSize(clean(nt),MX-M);doc.text(t,M,y);y+=t.length*11}
     cur='';
   }
   const n=doc.getNumberOfPages();
@@ -460,7 +499,7 @@ function renderList(){
     L.innerHTML=`<div class="hd">${list.length} song${list.length>1?'s':''}${team?' · keys for '+esc(team):''}</div>`+list.map(s=>{const u=usage(s.id);
       return `<a class="row" href="#song-${esc(s.id)}" aria-current="${!!(sel&&sel.type==='song'&&sel.id===s.id&&!sel.fromSet)}">
         <span class="t">${esc(s.title)}</span>
-        <span class="k"><span class="key">${esc(teamKey(s))}</span><br><span class="meta">${s.bpm?esc(s.bpm)+' bpm · ':''}${esc(s.sig)}</span></span>
+        <span class="k"><span class="key">${esc(teamKey(s)||'—')}</span><br><span class="meta">${s.bpm?esc(s.bpm)+' bpm · ':''}${esc(s.sig)}</span></span>
         <span class="s">${qRefs.length&&s.scripture?esc(s.scripture)+' · ':''}${esc(s.author)}${u.next?' · next '+fmtDate(u.next,{month:'short',day:'numeric'}):u.last?' · last '+fmtDate(u.last,{month:'short',day:'numeric'}):''}</span></a>`}).join('');
   }else{
     const vis=sets.filter(s=>!team||s.team===team);
@@ -483,7 +522,7 @@ function renderDetail(){
 
 function songView(D){
   const s=song(sel.id);if(!s){D.innerHTML=`<a class="btn ghost back" href="#">← Back</a><p class="empty">${sel.name?`“${esc(sel.name)}” isn’t on the Songs tab of the sheet yet, or its title is spelled differently.`:'This song isn’t in the songbook.'}</p>`;return}
-  if(!view.key)view.key=sel.key||teamKey(s);
+  if(!view.key)view.key=sel.key||teamKey(s)||'C';
   const shape=view.capo?shiftKey(view.key,-view.capo):view.key,beats=parseInt(s.sig)||4;
   const tks=Object.entries(s.teamKeys);
   const links=String(s.links||'').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const [a,b]=l.includes('|')?l.split('|').map(x=>x.trim()):[l,l];return /^https?:\/\//i.test(b)?`<a href="${esc(b)}" target="_blank" rel="noopener">${esc(a===b?b.replace(/^https?:\/\/(www\.)?/,'').slice(0,40):a)}</a>`:''}).join('');
@@ -493,10 +532,10 @@ function songView(D){
   <div class="acts"><button data-act="pdf-song">PDF</button></div></div>
   ${sel.note?`<div class="notes" style="margin-top:12px">${esc(sel.note)}</div>`:''}
   <div class="facts">
-    <div><small>Chart key</small><strong>${esc(s.key)}</strong></div>
+    <div><small>Chart key</small><strong>${esc(s.key||'—')}</strong></div>
     <div><small>Playing in</small><strong style="color:var(--chord)">${esc(view.key)}</strong></div>
     <div><small>Tempo <span id="pulse"></span></small><strong>${s.bpm?esc(s.bpm)+' bpm':'—'}</strong></div>
-    <div><small>Time</small><strong>${esc(s.sig)}</strong></div>
+    <div><small>Time</small><strong>${esc(s.sig||'—')}</strong></div>
   </div>
   ${s.scripture?`<div>${String(s.scripture).split(';').map(r=>r.trim()).filter(Boolean).map(r=>`<button class="ref" data-act="ref" data-r="${esc(r)}">${esc(r)}</button>`).join('')}</div>`:''}
   ${tks.length?`<div class="tk">${tks.map(([t,k])=>`<span>${esc(t)}: <b>${esc(k)}</b></span>`).join('')}</div>`:''}
@@ -515,6 +554,7 @@ function songView(D){
   ${view.capo&&view.mode==='ch'?`<p class="capo">Capo ${view.capo}: chords below are ${esc(shape)} shapes, sounding in ${esc(view.key)}.</p>`:''}
   <div class="chart" style="--cs:${view.size}px">${s.chart?chart(s.chart,s.key,view.mode==='ch'?shape:view.key,view.mode):'<p class="empty" style="padding:0">No chart yet. Add one in the Chart column of the sheet.</p>'}</div>
   ${s.notes?`<div class="notes">${esc(s.notes)}</div>`:''}
+  ${notice(s)?`<p class="help notice">${esc(notice(s))}</p>`:''}
   ${links?`<label>Links</label><p class="links">${links}</p>`:''}
   ${s.tags.length?`<p class="help">Tags: ${esc(s.tags.join(', '))}</p>`:''}
   ${st?`<div class="nextsong">${prv?`<a class="btn" href="#set-${esc(st.id)}/${sel.idx-1}">← ${esc(prv.name)}</a>`:'<span></span>'}${nxt?`<a class="btn pri" href="#set-${esc(st.id)}/${sel.idx+1}">Next: ${esc(nxt.name)} →</a>`:''}</div>`:''}`;
@@ -548,11 +588,12 @@ function editorsView(D){
   D.innerHTML=`<a class="btn ghost back" href="#">← Back</a>
   <h2>For editors</h2>
   <p class="by">Everything in this songbook comes from one Google Sheet. Change the sheet, and the band sees it the next time they open or refresh this page.</p>
-  <div class="acts" style="margin-top:16px"><a class="btn pri" href="${esc(SHEET_URL)}" target="_blank" rel="noopener">Open the songbook sheet</a></div>
+  ${SHEET_URL?`<div class="acts" style="margin-top:16px"><a class="btn pri" href="${esc(SHEET_URL)}" target="_blank" rel="noopener">Open the songbook sheet</a></div><p class="help">Only people the sheet is shared with can open it.</p>`:''}
   <ol class="steps">
     <li><b>Songs tab:</b> one row per song. Key is the key the chart is written in. Scripture references go in one cell, separated by semicolons.</li>
     <li><b>Sets tab:</b> one row per song, in playing order. Rows with the same Date and Service make one set. Pick the song from the dropdown so the title matches exactly.</li>
     <li><b>Team keys:</b> in the Songs tab, write <code>Youth=A; Wednesday Night=C</code>.</li>
+    <li><b>Copyright:</b> for copyrighted songs, put the © line in the Copyright column, e.g. <code>© 2001 Thankyou Music</code>, and your license number in a “CCLI license” row on the Settings tab. Charts and PDFs then show the notice CCLI requires.</li>
   </ol>
   <h3>Chart helper</h3>
   <p class="help">Paste a chart with chords above the lyrics, or with chords in brackets. Copy the result into the song’s Chart cell.</p>
@@ -604,6 +645,7 @@ document.addEventListener('click',async e=>{
   if(a==='tab'){tab=b.dataset.v;q='';qRefs=[];$('#q').value='';if(location.hash)location.hash='';else render()}
   else if(a==='editors')location.hash='editors';
   else if(a==='refresh')load(true);
+  else if(a==='lock'){lock();if(location.hash)history.replaceState(null,'',location.pathname+location.search);showGate();toast('Locked on this device')}
   else if(a==='tr'){view.key=shiftKey(view.key,+b.dataset.d);songView(D)}
   else if(a==='mode'){view.mode=b.dataset.m;remember();songView(D)}
   else if(a==='size'){view.size=Math.max(14,Math.min(40,view.size+ +b.dataset.d));remember();D.querySelector('.chart').style.setProperty('--cs',view.size+'px')}
@@ -611,7 +653,7 @@ document.addEventListener('click',async e=>{
   else if(a==='ref'){q=b.dataset.r;$('#q').value=q;qRefs=parseRefs(q);tab='songs';renderList();if(innerWidth<900){sel=null;history.pushState(null,'',location.pathname+location.search);render()}toast('Songs on '+q)}
   else if(a==='pdf-song'){const s=song(sel.id);offerPdf([{s,key:view.key,capo:view.capo,note:sel.note||''}],{mode:view.mode},`${s.title} (${view.key})`)}
   else if(a==='pdf-set'){const st=setById(sel.id),mode=$('#pdfmode').value;
-    const entries=st.items.map(it=>({s:song(it.songId),key:it.key,note:it.note})).filter(x=>x.s).map(x=>({...x,key:x.key||x.s.key}));
+    const entries=st.items.map(it=>({s:song(it.songId),key:it.key,note:it.note})).filter(x=>x.s).map(x=>({...x,key:x.key||x.s.key||'C'}));
     if(!entries.length){toast('None of these songs have charts yet.');return}
     offerPdf(entries,{mode,cover:{title:st.title,sub:[fmtDate(st.date,{weekday:'long',month:'long',day:'numeric',year:'numeric'}),st.team].filter(Boolean).join('  ·  ')}},`${st.date} ${st.title}`)}
   else if(a==='copyset'){const txt=setText(setById(sel.id));try{await navigator.clipboard.writeText(txt);toast('Copied. Paste it into a text to the team.')}catch(err){D.insertAdjacentHTML('beforeend',`<label>Select and copy</label><textarea readonly style="min-height:200px">${esc(txt)}</textarea>`);D.querySelector('textarea[readonly]').select()}}
@@ -625,13 +667,14 @@ document.addEventListener('click',async e=>{
   }
 });
 document.addEventListener('change',e=>{const i=e.target.dataset.pi;if(i===undefined)return;imp[+i].on=e.target.checked;impList()});
+$('#gate-f').addEventListener('submit',e=>{e.preventDefault();const v=$('#gate-p').value.trim();if(!v)return;store.set(KEYP,v);$('#gate-msg').textContent='Opening…';load(true)});
 $('#q').addEventListener('input',e=>{q=e.target.value.trim();qRefs=parseRefs(q);render()});
 $('#team').addEventListener('change',e=>{team=e.target.value;remember();if(sel&&sel.type==='song'&&!sel.key)view.key=null;render()});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-loadedAt>120000)load()});
 
 /* ---------- start ---------- */
-const cached=store.get('ns-cache-'+SHEET);
-if(cached){build(cached);loadedAt=cached.at;paint();status()}else route(true);
+const cached=API&&store.get(KEYP)?store.get(KEYC):null;
+if(cached&&Array.isArray(cached.songs)){build(cached);loadedAt=cached.at;paint();status()}else route(true);
 load();
 setInterval(()=>{if(!loading&&loadedAt)status()},60000);
 }
