@@ -2,13 +2,17 @@
 
 A free, phone-friendly songbook for worship teams. Musicians open a link and type the team passcode. They don't need an account or an app.
 
-- Set lists with each song's key, order and notes, plus a "Next song" button for stage use
-- Chord charts that change key in one tap, with capo shapes, Nashville numbers or lyrics only
-- Separate keys for each team (Sunday Morning, Youth, Wednesday Night…)
-- Search by title, lyrics, tags or Scripture reference (Ps 23, Rev 4:8)
-- PDF of a whole set or one song, with CCLI copyright notices, plus a "Copy for a text" set summary
-- A tempo pulse with an optional click
-- Works offline once opened; "Lock" clears it from a device
+**For musicians**
+- **This Sunday**: opens on your team's next set, with a big "Start the set" button
+- **Your part**: guitar (with capo shapes), keys, bass (bass notes highlighted), drums and vocals (lyrics, tempo, song order), and B♭, E♭ or F horns (chords already transposed)
+- **Stage mode**: dark, large text, screen stays awake; swipe, arrow keys or a page-turner pedal move between songs
+- Change key in one tap, Nashville numbers, tempo pulse and click, PDFs with CCLI notices, Scripture search
+- Add to Home Screen; works without signal once opened; "Lock" clears it from a device
+
+**For leaders** (with the editor passcode)
+- **Add a song**: paste text copied from SongSelect (or a ChordPro file); title, key, CCLI number, writers, tempo and time fill in, with a live preview
+- **Build a set**: pick the date and team, get song suggestions from the sermon text, drag to reorder, set keys and notes, see warnings for songs used in the last four weeks, then save and text the band
+- Everything saves into the Google Sheet for you
 
 All the content lives in **one private Google Sheet** that your worship leaders edit. A small Google Apps Script attached to the sheet hands the songs to the page **only after the right team passcode is entered**. The sheet itself is never public.
 
@@ -19,14 +23,17 @@ All the content lives in **one private Google Sheet** that your worship leaders 
 | `index.html` | The band page: one file, with no build step |
 | `apps-script/Code.gs` | The passcode script that goes inside your Google Sheet |
 | `songbook-template.xlsx` | A starter sheet with Songs, Sets, Settings and How to tabs |
+| `manifest.webmanifest`, `icon-*.png`, `apple-touch-icon.png` | Let musicians add New Song to their home screen |
+| `sw.js` | Keeps the page itself available without signal (it never stores songs) |
 | `robots.txt`, `.nojekyll` | Keep search engines out; tell GitHub Pages to serve the files as they are |
 
 ## Make it private (one-time setup, about 15 minutes)
 
 **1. Prepare the sheet**
-- On the **Settings** tab, add two rows:
-  - `Team passcode` | a passphrase of 6 or more characters (for example `still waters 23`)
-  - `CCLI license` | your church's CCLI license number
+- On the **Settings** tab, add three rows:
+  - `Team passcode` | a passphrase for musicians, 6 or more characters (for example `still waters 23`)
+  - `Editor passcode` | a different passphrase for leaders who add songs and build sets
+  - `CCLI license` | your church's Church Copyright License number
 - On the **Songs** tab, type `Copyright` as the header of column N. For copyrighted songs, put the © line there (for example `© 2001 Thankyou Music`).
 
 **2. Add the script**
@@ -51,10 +58,10 @@ If "Anyone" isn't offered, your Google Workspace administrator has turned it off
 - Share the sheet as **Editor** only with the people who maintain songs and sets.
 
 **6. Tell the band**
-- Send the page link and the passcode in separate messages.
-- To change the passcode, edit the Settings row. Everyone will be asked for the new one the next time they refresh.
+- Send the page link and the team passcode in separate messages. Give the editor passcode only to leaders.
+- To change a passcode, edit its Settings row. Everyone using it will be asked for the new one the next time they refresh.
 
-**When you edit Code.gs later:** use Deploy › Manage deployments › Edit › Version: New version, so the same URL keeps working.
+**When Code.gs changes** (for example, when you install this version): paste the new code over the old, Save, then use **Deploy › Manage deployments**, click the pencil, choose **Version: New version**, and **Deploy**. The web app URL stays the same, so the page doesn't need changing.
 
 ## Put the page online (GitHub Pages)
 
