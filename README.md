@@ -87,3 +87,8 @@ The page's code is public, but it holds no songs. The songs only come from the s
 ## Copyright
 
 Copyrighted lyrics and charts need your church's CCLI license. CCLI allows sharing them with your worship team through a password-protected place, not on a public website; sharing charts this way may also need CCLI's Rehearsal option. Confirm with CCLI that a shared team passcode meets your license terms. Public-domain hymns need no license or notice.
+
+
+## Adding songs from a photo
+
+On **Add a song**, tap **Take a photo** (or **Choose photos** for several pages). The text is read on the phone itself; nothing is sent anywhere. Chords printed above the lyrics are placed on the right syllables. Always check the result before saving, since photos can misread a chord or word. Best for public-domain hymnals and your own charts; for copyrighted songs, use SongSelect downloads.

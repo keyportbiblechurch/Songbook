@@ -837,9 +837,12 @@ function songEditor(D){
   <h2>${s?'Edit song':'Add a song'}</h2>
   <form id="ef" autocomplete="off" novalidate>
     <label for="e-src">${s?'Chart':'Paste from SongSelect'}</label>
-    <textarea id="e-src" class="mono" style="min-height:190px" placeholder="Copy the chord sheet text from SongSelect and paste it here.&#10;Charts with chords above the lyrics, or ChordPro, work too.">${esc(ed.src)}</textarea>
-    <p class="help">Or <label for="e-file" class="linkish">choose a ChordPro file</label> from your SongSelect downloads.</p>
+    <textarea id="e-src" class="mono" style="min-height:190px" placeholder="Paste text copied from SongSelect, or take a photo below.&#10;Charts with chords above the lyrics, or ChordPro, work too.">${esc(ed.src)}</textarea>
+    <div class="acts" style="margin-top:8px"><label class="btn" for="e-cam"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-right:6px"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>Take a photo</label><label class="btn" for="e-pic">Choose photos</label><label class="btn" for="e-file">ChordPro file</label></div>
+    <input id="e-cam" type="file" accept="image/*" capture="environment" hidden>
+    <input id="e-pic" type="file" accept="image/*" multiple hidden>
     <input id="e-file" type="file" accept=".cho,.chordpro,.chopro,.crd,.pro,.txt" hidden>
+    <p class="help" id="e-ocr" role="status">Photograph a hymnal page or chord sheet, or paste text copied from SongSelect.</p>
     <div id="e-found"></div>
     <label for="e-title">Title</label><input id="e-title" data-f="title" value="${v('title')}" required>
     <p class="help" id="e-dup"></p>
@@ -866,6 +869,8 @@ function songEditor(D){
   const form=$('#ef');
   form.addEventListener('input',e=>{const k=e.target.dataset.f;if(k){f[k]=e.target.value;delete ed.auto[k];if(k==='title')dupCheck()}if(e.target.id==='e-src'){ed.src=e.target.value;parseSrc()}});
   form.addEventListener('change',e=>{const k=e.target.dataset.f;if(k){f[k]=e.target.value;delete ed.auto[k]}});
+  $('#e-cam').onchange=e=>{scanPhotos([...e.target.files]);e.target.value=''};
+  $('#e-pic').onchange=e=>{scanPhotos([...e.target.files]);e.target.value=''};
   $('#e-file').onchange=async e=>{const fl=e.target.files[0];if(!fl)return;ed.src=await fl.text();$('#e-src').value=ed.src;parseSrc(fl.name)};
   form.addEventListener('submit',e=>{e.preventDefault();saveSongForm()});
   parseSrc(null,true);dupCheck();
@@ -1053,6 +1058,81 @@ function ccliView(D){
 }
 function ccliText(){const d=ccliData();return `CCLI report, ${fmtDate(rep.from)} to ${fmtDate(rep.to)} (${d.services} services)${settings.license?'\nCCLI License # '+settings.license:''}\n\n`+d.report.map(r=>`${r.s.title} | CCLI ${r.s.ccli||'MISSING'} | ${r.dates.length} service${r.dates.length>1?'s':''}`).join('\n')}
 function ccliCSV(){const d=ccliData(),q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';return ['Title,CCLI song #,Writers,Copyright,Services,Dates'].concat(d.report.map(r=>[r.s.title,r.s.ccli,r.s.author,r.s.copyright,r.dates.length,r.dates.join(' ')].map(q).join(','))).join('\n')}
+
+/* ---------- reading photos (leaders) ---------- */
+/* Turns the text-reader's lines, words and letter positions into a chart.
+   A line made only of chords is matched letter by letter to the lyric line under it,
+   so each chord lands on the syllable it sits over in the photo. */
+const OCR_FIX=t=>String(t).replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/^([A-G])([a-g])(?=$|\/)/,(m,a,b)=>a.toLowerCase()===b&&b!=='b'?a:m).replace(/^([A-G])H(?=$|m|\/|\d|sus|maj|add)/,'$1#').replace(/^([A-G])(?:ff|f)(?=$|m|\/|\d)/,'$1b').replace(/\/([A-G])H$/,'/$1#');
+function ocrLayout(data){
+  const raw=(data&&data.lines)||[];
+  const lines=raw.map(l=>({y0:l.bbox.y0,y1:l.bbox.y1,x0:l.bbox.x0,words:(l.words||[]).map(w=>({t:(w.text||'').trim(),x0:w.bbox.x0,x1:w.bbox.x1,sym:(w.symbols||[]).map(s=>({c:s.text,x0:s.bbox.x0,x1:s.bbox.x1}))})).filter(w=>w.t)})).filter(l=>l.words.length);
+  if(!lines.length)return String((data&&data.text)||'').trim();
+  const cws=[];lines.forEach(l=>l.words.forEach(w=>{if(w.t.length>=3)cws.push((w.x1-w.x0)/w.t.length)}));cws.sort((a,b)=>a-b);
+  const cw=cws.length?cws[cws.length>>1]:12;
+  const hs=lines.map(l=>l.y1-l.y0).sort((a,b)=>a-b),lh=hs[hs.length>>1]||24;
+  const isChords=l=>l.words.every(w=>CHORDTOK.test(OCR_FIX(w.t))||/^(\||-|\/|N\.?C\.?|x\d+|\(x\d+\))$/i.test(w.t))&&l.words.some(w=>CHORDTOK.test(OCR_FIX(w.t)));
+  const lyric=l=>{let s='';const xs=[];l.words.forEach((w,i)=>{if(i){s+=' ';xs.push(l.words[i-1].x1)}
+    if(w.t==='|'||w.t==='l'&&l.words.length>1)w.t='I';
+    const syms=w.sym.length===w.t.length?w.sym:null;for(let k=0;k<w.t.length;k++){s+=w.t[k];xs.push(syms?syms[k].x0:w.x0+(w.x1-w.x0)*k/w.t.length)}});return {s,xs}};
+  const out=[];let prev=null;
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i];
+    if(prev&&l.y0-prev.y1>lh*1.25&&out.length&&out[out.length-1]!=='')out.push('');
+    if(isChords(l)){
+      const nx=lines[i+1];
+      if(nx&&!isChords(nx)&&nx.y0-l.y1<lh*1.4&&!SECRX.test(nx.words.map(w=>w.t).join(' '))){
+        let {s,xs}=lyric(nx);
+        const chords=l.words.filter(w=>CHORDTOK.test(OCR_FIX(w.t))).map(w=>({c:OCR_FIX(w.t).replace(/[()]/g,''),x:w.x0})).sort((a,b)=>b.x-a.x);
+        let limit=s.length;
+        for(const ch of chords){
+          let idx=-1,bestD=Infinity;
+          for(let k=0;k<limit;k++){if(s[k]===' '||s[k]==='[')continue;const dd=Math.abs(xs[k]-ch.x);if(dd<bestD){bestD=dd;idx=k}}
+          if(idx>=0&&ch.x>xs[xs.length-1]+cw*1.5)idx=-1;
+          if(idx<0){const gap=Math.max(1,Math.round((ch.x-(xs.length?xs[xs.length-1]:nx.x0))/cw));s=s+' '.repeat(gap);idx=s.length;xs.push(...Array(gap).fill(ch.x))}
+          s=s.slice(0,idx)+'['+ch.c+']'+s.slice(idx);limit=idx;
+        }
+        out.push(s.replace(/\s+$/,''));prev=nx;i++;continue;
+      }
+      out.push(l.words.map(w=>'['+OCR_FIX(w.t).replace(/[()]/g,'')+']').join(' '));prev=l;continue;
+    }
+    out.push(lyric(l).s);prev=l;
+  }
+  return out.join('\n').replace(/\n{3,}/g,'\n\n').trim();
+}
+
+let ocrLib=null,ocrWorker=null;
+function loadOcr(){
+  if(ocrLib)return ocrLib;
+  if(window.Tesseract)return ocrLib=Promise.resolve(window.Tesseract);
+  ocrLib=new Promise((ok,no)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';sc.onload=()=>ok(window.Tesseract);sc.onerror=()=>{ocrLib=null;no(new Error('load'))};document.head.appendChild(sc)});
+  return ocrLib;
+}
+async function shrinkImage(file){
+  try{const bmp=await createImageBitmap(file);const sc=Math.min(1,2400/Math.max(bmp.width,bmp.height));
+    const c=document.createElement('canvas');c.width=Math.round(bmp.width*sc);c.height=Math.round(bmp.height*sc);
+    const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(bmp,0,0,c.width,c.height);
+    return await new Promise(r=>c.toBlob(b=>r(b||file),'image/jpeg',0.92));}catch(e){return file}
+}
+async function scanPhotos(files){
+  const st=$('#e-ocr');if(!files||!files.length||!ed)return;
+  const say=m=>{if(st)st.textContent=m};
+  say('Getting the text reader ready… the first time takes a little longer.');
+  let T;try{T=await loadOcr()}catch(e){say('Couldn’t load the text reader. Check your connection and try again.');return}
+  try{
+    if(!ocrWorker)ocrWorker=await T.createWorker('eng',1,{logger:m=>{if(m.status==='recognizing text')say(`Reading the photo… ${Math.round(m.progress*100)}%`)}});
+    const parts=[];
+    for(let i=0;i<files.length;i++){
+      say(files.length>1?`Reading photo ${i+1} of ${files.length}…`:'Reading the photo…');
+      const {data}=await ocrWorker.recognize(await shrinkImage(files[i]));
+      const txt=ocrLayout(data);if(txt)parts.push(txt);
+    }
+    if(!parts.length){say('No text found. Try a closer, brighter photo, held straight above the page.');return}
+    ed.src=(ed.src.trim()?ed.src.replace(/\s+$/,'')+'\n\n':'')+parts.join('\n\n');
+    const box=$('#e-src');if(box)box.value=ed.src;parseSrc();
+    say('Done. Check the chart and the preview below; photos can misread a chord or a word.');
+  }catch(e){say('Couldn’t read that photo. Try again with a sharper picture.')}
+}
 
 /* ---------- routing ---------- */
 function route(keep){
