@@ -149,6 +149,9 @@ body.stage{--bg:#120b0e;--ink:#f3ecee;--mute:#b7a7ac;--line:#2e2226;--soft:#1b12
 body.stage header,body.stage .bar,body.stage #list,body.stage #gate{display:none}
 body.stage .wrap{grid-template-columns:minmax(0,1fr)}
 body.stage #detail{display:block!important;padding:18px 18px 160px;max-width:900px;margin:0 auto;width:100%}
+.ccli{width:100%;border-collapse:collapse;font-size:15px}.ccli th{text-align:left;font-size:13px;color:var(--mute);padding:8px 10px 6px 0;border-bottom:1px solid var(--line)}
+.ccli td{padding:10px 10px 10px 0;border-bottom:1px solid var(--line);vertical-align:top}.ccli td small{display:block;color:var(--mute);font-size:13px}.ccli .num{text-align:right;white-space:nowrap}.scroll{overflow-x:auto}
+@media(max-width:600px){.ccli thead{display:none}.ccli tr{display:grid;padding:8px 0;border-bottom:1px solid var(--line)}.ccli td{display:flow-root;border:0;padding:3px 0 3px 6.5em;text-align:left}.ccli td::before{content:attr(data-l);float:left;width:6em;margin-left:-6.5em;color:var(--mute);font-size:13px}.ccli .num{text-align:left}}
 #gate{padding:clamp(28px,6vw,72px) max(5vw,16px);max-width:520px}
 body.gated .bar,body.gated main,body.gated .tabs{display:none}
 .notice{margin-top:24px;padding-top:10px;border-top:1px solid var(--line)}
@@ -634,6 +637,7 @@ function renderList(){
 function renderDetail(){
   const D=$('#detail');
   if(sel&&sel.type==='home')return homeView(D);
+  if(sel&&sel.type==='ccli')return ccliView(D);
   if(sel&&sel.type==='editsong')return songEditor(D);
   if(sel&&sel.type==='editset')return setEditor(D);
   if(!sel){stopMet();const nx=sets.filter(s=>s.date>=today&&(!team||s.team===team)).sort((a,b)=>a.date.localeCompare(b.date))[0];
@@ -717,7 +721,7 @@ function editorsView(D){
   D.innerHTML=`<a class="btn ghost back" href="#">← Back</a>
   <h2>For editors</h2>
   <p class="by">${isEditor?'You’re signed in as a leader. Add songs and build sets right here; they save into the songbook sheet.':'Leaders can add songs and build sets in the app after opening it with the editor passcode.'}</p>
-  ${isEditor?'<div class="acts" style="margin-top:14px"><a class="btn pri" href="#new-song">+ Add a song</a><a class="btn pri" href="#new-set">+ New set</a></div>':''}
+  <div class="acts" style="margin-top:14px">${isEditor?'<a class="btn pri" href="#new-song">+ Add a song</a><a class="btn pri" href="#new-set">+ New set</a>':''}<a class="btn" href="#ccli">CCLI report</a></div>
   ${SHEET_URL?`<div class="acts" style="margin-top:16px"><a class="btn pri" href="${esc(SHEET_URL)}" target="_blank" rel="noopener">Open the songbook sheet</a></div><p class="help">Only people the sheet is shared with can open it.</p>`:''}
   <ol class="steps">
     <li><b>Songs tab:</b> one row per song. Key is the key the chart is written in. Scripture references go in one cell, separated by semicolons.</li>
@@ -1001,6 +1005,55 @@ document.addEventListener('touchstart',e=>{if(!document.body.classList.contains(
 document.addEventListener('touchend',e=>{if(!tx||!sel||!sel.fromSet)return;const t=e.changedTouches[0],dx=t.clientX-tx.x,dy=t.clientY-tx.y;tx=null;
   if(Math.abs(dx)>70&&Math.abs(dy)<60){const st=setById(sel.fromSet),i=sel.idx+(dx<0?1:-1);if(st&&st.items[i])location.hash=`set-${st.id}/${i}`}},{passive:true});
 
+
+/* ---------- CCLI report ---------- */
+let rep=null;
+const isPD=s=>!!s&&!s.copyright&&/public domain/i.test(s.tags.join(' '));
+function ccliData(){
+  const used=new Map();let services=0;
+  for(const st of sets){if(st.date<rep.from||st.date>rep.to)continue;services++;const seen=new Set();
+    for(const it of st.items){const k=it.songId||('?'+it.name.toLowerCase());if(seen.has(k))continue;seen.add(k);
+      if(!used.has(k))used.set(k,{s:song(it.songId),name:it.name,dates:[]});used.get(k).dates.push(st.date)}}
+  const all=[...used.values()].map(r=>({...r,dates:r.dates.sort()})),by=(a,b)=>b.dates.length-a.dates.length||(a.s?a.s.title:a.name).localeCompare(b.s?b.s.title:b.name);
+  return {services,report:all.filter(r=>r.s&&!isPD(r.s)).sort(by),pd:all.filter(r=>isPD(r.s)).sort(by),missing:all.filter(r=>!r.s).sort(by)};
+}
+function ccliView(D){
+  stopMet();
+  if(!rep){const f=new Date();f.setMonth(f.getMonth()-6);rep={from:isoDay(f),to:today}}
+  const d=ccliData(),short=x=>fmtDate(x,{month:'short',day:'numeric'});
+  const noNum=d.report.filter(r=>!r.s.ccli).length;
+  D.innerHTML=`<a class="btn ghost back" style="display:inline-flex" href="#editors">← For editors</a>
+  <h2>CCLI report</h2>
+  <p class="by">Copyrighted songs used in services during the dates you pick, with their CCLI numbers. Use it when CCLI asks your church to report.</p>
+  <div class="grid2" style="max-width:440px">
+    <div><label for="cr-from">From</label><input id="cr-from" type="date" value="${esc(rep.from)}"></div>
+    <div><label for="cr-to">To</label><input id="cr-to" type="date" value="${esc(rep.to)}"></div>
+  </div>
+  <div class="facts">
+    <div><small>Services</small><strong>${d.services}</strong></div>
+    <div><small>Songs to report</small><strong>${d.report.length}</strong></div>
+    <div><small>Public domain, skipped</small><strong>${d.pd.length}</strong></div>
+  </div>
+  ${noNum?`<p class="warn" style="display:block;margin-bottom:12px">${noNum} song${noNum>1?'s have':' has'} no CCLI number yet. Look ${noNum>1?'them':'it'} up in SongSelect and add ${noNum>1?'them':'it'} with Edit.</p>`:''}
+  ${d.report.length?`<div class="scroll"><table class="ccli"><thead><tr><th>Song</th><th>CCLI #</th><th class="num">Services</th><th>Dates</th></tr></thead><tbody>
+  ${d.report.map(r=>`<tr><td data-l="Song"><a href="#song-${esc(r.s.id)}">${esc(r.s.title)}</a>${r.s.author?`<small>${esc(r.s.author)}</small>`:''}</td><td data-l="CCLI #">${r.s.ccli?esc(r.s.ccli):`<span class="warn">Missing</span>${isEditor?` <a href="#edit-song-${esc(r.s.id)}">Add</a>`:''}`}</td><td class="num" data-l="Services">${r.dates.length}</td><td data-l="Dates">${r.dates.map(short).join(', ')}</td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="acts" style="margin-top:14px"><button class="pri" data-act="cr-copy">Copy as text</button><button data-act="cr-csv">Download for a spreadsheet</button></div>`:'<p class="empty" style="padding-left:0">No copyrighted songs were used in these dates.</p>'}
+  ${d.missing.length?`<p class="help" style="margin-top:18px"><b>Not in the songbook:</b> ${d.missing.map(r=>esc(r.name)).join(', ')}. These set rows don’t match a song title, so check them by hand.</p>`:''}
+  ${d.pd.length?`<details><summary>Public domain songs used (${d.pd.length}), not reported</summary><p class="help">${d.pd.map(r=>`${esc(r.s.title)} (${r.dates.length})`).join(', ')}</p><p class="help">These are tagged “public domain” and have no Copyright line. If you used a copyrighted arrangement of one, add its © line and CCLI number, and it will move into the report.</p></details>`:''}
+  <h3>How to enter it at CCLI</h3>
+  <ol class="steps">
+    <li>Sign in at <a href="https://reporting.ccli.com" target="_blank" rel="noopener">reporting.ccli.com</a> during your reporting period.</li>
+    <li>Search each song by its CCLI number.</li>
+    <li>Enter how many copies you made of each kind. “Services” above is how many services each song was sung in; if you project lyrics, that is usually one projection per service. Add any printed, recorded or streamed copies too.</li>
+  </ol>
+  <p class="help">If your projection software reports to CCLI automatically, you don’t need this report for projected lyrics.</p>`;
+  const upd=()=>{rep.from=$('#cr-from').value||rep.from;rep.to=$('#cr-to').value||rep.to;if(rep.from>rep.to)[rep.from,rep.to]=[rep.to,rep.from];ccliView(D)};
+  $('#cr-from').onchange=upd;$('#cr-to').onchange=upd;
+}
+function ccliText(){const d=ccliData();return `CCLI report, ${fmtDate(rep.from)} to ${fmtDate(rep.to)} (${d.services} services)${settings.license?'\nCCLI License # '+settings.license:''}\n\n`+d.report.map(r=>`${r.s.title} | CCLI ${r.s.ccli||'MISSING'} | ${r.dates.length} service${r.dates.length>1?'s':''}`).join('\n')}
+function ccliCSV(){const d=ccliData(),q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';return ['Title,CCLI song #,Writers,Copyright,Services,Dates'].concat(d.report.map(r=>[r.s.title,r.s.ccli,r.s.author,r.s.copyright,r.dates.length,r.dates.join(' ')].map(q).join(','))).join('\n')}
+
 /* ---------- routing ---------- */
 function route(keep){
   const h=decodeURIComponent(location.hash.slice(1));let next=null;
@@ -1008,6 +1061,7 @@ function route(keep){
   else if(h.startsWith('set-')){const [sid,i]=h.slice(4).split('/');const st=setById(sid);
     if(i!==undefined&&st&&st.items[+i]){const it=st.items[+i];next={type:'song',id:it.songId,name:it.name,key:it.key,note:it.note,fromSet:sid,idx:+i}}else next={type:'set',id:sid};tab='sets'}
   else if(h==='editors')next={type:'editors'};
+  else if(h==='ccli')next={type:'ccli'};
   else if(h==='sets'||h==='songs'){tab=h;next=null}
   else if(h==='new-song')next={type:'editsong',id:null};
   else if(h.startsWith('edit-song-'))next={type:'editsong',id:h.slice(10)};
@@ -1035,6 +1089,8 @@ document.addEventListener('click',async e=>{
   else if(a==='unstage'){const nav=b.tagName==='A';stage=false;stopMet();if(!nav)render();else document.body.classList.remove('stage')}
   else if(a==='shareset')shareSet(setById(sel.id));
   else if(a==='tap'){const t=performance.now();if(taps.length&&t-taps[taps.length-1]>2000)taps=[];taps.push(t);if(taps.length>8)taps.shift();if(taps.length>1&&ed){const bpm=Math.round(60000*(taps.length-1)/(taps[taps.length-1]-taps[0]));ed.f.bpm=String(bpm);delete ed.auto.bpm;const el=$('#e-bpm');if(el)el.value=bpm}}
+  else if(a==='cr-copy'){try{await navigator.clipboard.writeText(ccliText());toast('Copied')}catch(err){toast('Couldn’t copy. Try the download instead.')}}
+  else if(a==='cr-csv')saveFile(new Blob([ccliCSV()],{type:'text/csv'}),`CCLI report ${rep.from} to ${rep.to}.csv`);
   else if(a==='se-team'){ed.team=b.dataset.t;seTeams();seItems();seRes()}
   else if(a==='se-add')seAdd(b.dataset.id);
   else if(a==='se-rm'){ed.items.splice(+b.dataset.i,1);seItems();seSug();seRes()}
